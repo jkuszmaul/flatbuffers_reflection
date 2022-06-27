@@ -1,3 +1,4 @@
-export function foo(): number {
-  return 42;
-}
+export * from "./reflection";
+// ts-prune doesn't seem to pickup things that are just used in tests currently...
+// ts-prune-ignore-next
+export { BaseType, Schema, SchemaT, FieldT, Type } from "./reflection_generated";

@@ -208,7 +208,7 @@ export class Parser {
   // If readDefaults is set to true, then scalar fields will be filled out with
   // their default values if not populated; if readDefaults is false and the
   // field is not populated, the resulting object will not populate the field.
-  toObject(table: Table, readDefaults: boolean = false): Record<string, any> {
+  toObject(table: Table, readDefaults = false): Record<string, any> {
     const result: Record<string, any> = {};
     const schema = this.getType(table.typeIndex);
     const numFields = schema.fieldsLength();
@@ -305,11 +305,7 @@ export class Parser {
   // readDefaults is true and the field is unset, we will look-up the default
   // value for the field and return that.
   // For 64-bit fields, returns a flatbuffer Long rather than a standard number.
-  readScalar(
-    table: Table,
-    fieldName: string,
-    readDefaults: boolean = false,
-  ): number | BigInt | null {
+  readScalar(table: Table, fieldName: string, readDefaults = false): number | BigInt | null {
     return this.readScalarLambda(table.typeIndex, fieldName, readDefaults)(table);
   }
   // Like readScalar(), except that this returns an accessor for the specified
@@ -319,7 +315,7 @@ export class Parser {
   readScalarLambda(
     typeIndex: number,
     fieldName: string,
-    readDefaults: boolean = false,
+    readDefaults = false,
   ): (t: Table) => number | BigInt | null {
     const field = this.getField(fieldName, typeIndex);
     const fieldType = field.type();

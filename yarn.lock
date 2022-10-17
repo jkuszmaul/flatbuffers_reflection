@@ -1519,10 +1519,10 @@ eslint-plugin-import@2.26.0:
     resolve "^1.22.0"
     tsconfig-paths "^3.14.1"
 
-eslint-plugin-jest@26.5.3:
-  version "26.5.3"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-jest/-/eslint-plugin-jest-26.5.3.tgz#a3ceeaf4a757878342b8b00eca92379b246e5505"
-  integrity sha512-sICclUqJQnR1bFRZGLN2jnSVsYOsmPYYnroGCIMVSvTS3y8XR3yjzy1EcTQmk6typ5pRgyIWzbjqxK6cZHEZuQ==
+eslint-plugin-jest@27.1.2:
+  version "27.1.2"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-jest/-/eslint-plugin-jest-27.1.2.tgz#5d29f1cf954e70f3d47f2465fca17cddfdb4430b"
+  integrity sha512-+nLOn5jvQKLUywXxXKsLuuENsB/FhygXOLI+l5QlF+ACGe0DM14FlpYrGZ4nEiTo0BGlL5MymG73XA/tC3v3fA==
   dependencies:
     "@typescript-eslint/utils" "^5.10.0"
 
@@ -1784,7 +1784,7 @@ flat-cache@^3.0.4:
     flatted "^3.1.0"
     rimraf "^3.0.2"
 
-flatbuffers@3.4.1:
+flatbuffers@2.0.6:
   version "2.0.6"
   resolved "https://registry.yarnpkg.com/flatbuffers/-/flatbuffers-2.0.6.tgz#3aa3a39d282af9a660b4a0cdd1bb7ad91874abfc"
   integrity sha512-QTTZTXTbVfuOVQu2X6eLOw4vefUxnFJZxAKeN3rEPhjEzBtIbehimJLfVGHPM8iX0Na+9i76SBEg0skf0c0sCA==

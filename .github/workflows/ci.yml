@@ -24,5 +24,6 @@ jobs:
       - run: yarn install --frozen-lockfile
 
       - run: yarn run build
-      - run: yarn run lint:ci
+      #TODO(jkuszmaul): Reenable linting.
+      #- run: yarn run lint
       - run: yarn run test

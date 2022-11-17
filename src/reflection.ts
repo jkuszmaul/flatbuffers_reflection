@@ -429,8 +429,7 @@ export class Parser {
     if (!isScalar(elementType)) {
       throw new Error("Field " + fieldName + " is not an vector of scalars.");
     }
-    const isByteVector =
-      elementType === reflection.BaseType.UByte || elementType === reflection.BaseType.Byte;
+    const isUByteVector = elementType === reflection.BaseType.UByte;
 
     return (table: Table) => {
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
@@ -444,7 +443,7 @@ export class Parser {
 
       let result: (number | BigInt)[] | Uint8Array;
       // If the vector is a byte vector, we can return a slice into the buffer
-      if (isByteVector) {
+      if (isUByteVector) {
         result = new Uint8Array(table.bb.bytes().buffer, baseOffset, numElements);
       } else {
         result = [];

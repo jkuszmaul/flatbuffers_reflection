@@ -444,7 +444,9 @@ export class Parser {
       let result: (number | BigInt)[] | Uint8Array;
       // If the vector is a byte vector, we can return a slice into the buffer
       if (isUByteVector) {
-        result = new Uint8Array(table.bb.bytes().buffer, baseOffset, numElements);
+        result = new Uint8Array(table.bb.bytes().buffer,
+                                table.bb.bytes().byteOffset + baseOffset,
+                                numElements);
       } else {
         result = [];
         for (let ii = 0; ii < numElements; ++ii) {

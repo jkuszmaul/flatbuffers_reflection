@@ -91,6 +91,27 @@ describe("parseReflectionSchema", () => {
     const byteVectorObject = parser.toObject(table);
     expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
   });
+  it("converts uint8 vectors to uint8arrays in an offset Uint8Array source", () => {
+    const builder = new Builder();
+    const data = ByteVector.createDataVector(builder, [1, 2, 3]);
+    ByteVector.startByteVector(builder);
+    ByteVector.addData(builder, data);
+    const byteVector = ByteVector.endByteVector(builder);
+    builder.finish(byteVector);
+    const paddingLength = 10;
+    const backingBuffer = new Uint8Array(builder.asUint8Array().length + paddingLength);
+    backingBuffer.set(new Array(paddingLength).fill(0));
+    backingBuffer.set(builder.asUint8Array(), paddingLength);
+    const byteVectorBB =
+        new ByteBuffer(new Uint8Array(backingBuffer.buffer, paddingLength,
+                                      backingBuffer.length - paddingLength));
+    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/ByteVector.bfbs`));
+    const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
+    const parser = new Parser(rawSchema);
+    const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
+    const byteVectorObject = parser.toObject(table);
+    expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+  });
 });
 
 // Finally, to cover some things not covered by the reflection schema we use

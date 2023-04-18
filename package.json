@@ -1,6 +1,6 @@
 {
   "name": "flatbuffers_reflection",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Library for performing reflection on Flatbuffers in typescript",
   "license": "Apache-2.0",
   "repository": {

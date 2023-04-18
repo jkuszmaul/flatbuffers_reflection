@@ -128,7 +128,7 @@ export class Table {
     // See https://flatbuffers.dev/md__internals.html for format details.
 
     // Check that the table could plausibly fit in bounds
-    if (offset + 4 > bb.capacity()) {
+    if (offset < 0 || offset + 4 > bb.capacity()) {
       throw new Error(
         `Attempt to construct Table with offset ${offset}, which would extend beyond ByteBuffer (capacity ${bb.capacity()})`,
       );
@@ -194,7 +194,7 @@ export class Table {
         return new Table(
           bb,
           ii,
-          offset === undefined ? bb.readInt32(bb.position()) + bb.position() : offset,
+          offset === undefined ? bb.readUint32(bb.position()) + bb.position() : offset,
         );
       }
     }
@@ -203,7 +203,7 @@ export class Table {
   // Reads a scalar of a given type at a given offset.
   readScalar(fieldType: reflection.BaseType, offset: number): number | BigInt {
     const size = typeSize(fieldType);
-    if (offset + size > this.bb.capacity()) {
+    if (offset < 0 || offset + size > this.bb.capacity()) {
       throw new Error(
         `Attempt to read scalar type ${fieldType} (size ${size}) at offset ${offset}, which would extend beyond ByteBuffer (capacity ${this.bb.capacity()})`,
       );

@@ -118,6 +118,10 @@ describe("parseReflectionSchema", () => {
       "Attempt to parse root table offset from 0, which would extend beyond ByteBuffer (capacity 3)",
     );
 
+    expect(() => Table.getRootTable(new ByteBuffer(new Uint8Array([255, 255, 255, 255])))).toThrow(
+      "Attempt to construct Table with offset 4294967295, which would extend beyond ByteBuffer (capacity 4)",
+    );
+
     expect(() =>
       Table.getRootTable(new ByteBuffer(new Uint8Array([6, 0, 0, 0, 0, 0, 0, 0]))),
     ).toThrow(

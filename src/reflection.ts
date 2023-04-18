@@ -124,11 +124,62 @@ export class Table {
     public readonly bb: ByteBuffer,
     public readonly typeIndex: number,
     public readonly offset: number,
-  ) {}
+  ) {
+    // See https://flatbuffers.dev/md__internals.html for format details.
+
+    // Check that the table could plausibly fit in bounds
+    if (offset + 4 > bb.capacity()) {
+      throw new Error(
+        `Attempt to construct Table with offset ${offset}, which would extend beyond ByteBuffer (capacity ${bb.capacity()})`,
+      );
+    }
+    // Check that the table's vtable could fit in bounds
+    const offsetToVtable = bb.readInt32(offset);
+    const vtableOffset = offset - offsetToVtable;
+    const vtableMinSize = 2 * 2; // 2x uint16: vtable size and object size
+    if (vtableOffset < 0 || vtableOffset + vtableMinSize > bb.capacity()) {
+      throw new Error(
+        `Table at offset ${offset} points to vtable at ${vtableOffset} (${offset} - ${offsetToVtable}), which would extend beyond the ByteBuffer (capacity ${bb.capacity()})`,
+      );
+    }
+
+    // The vtable's first entry is the size of the vtable itself; check that it fits in bounds.
+    const vtableActualSize = bb.readUint16(vtableOffset);
+    if (vtableActualSize < 4) {
+      throw new Error(
+        `Table at offset ${offset} points to vtable at ${vtableOffset} (${offset} - ${offsetToVtable}), which specifies vtable size ${vtableActualSize}, which should be at least 4 (vtable size + object size)`,
+      );
+    }
+    if (vtableOffset + vtableActualSize > bb.capacity()) {
+      throw new Error(
+        `Table at offset ${offset} points to vtable at ${vtableOffset} (${offset} - ${offsetToVtable}), which specifies vtable size ${vtableActualSize}, which would extend beyond the ByteBuffer (capacity ${bb.capacity()})`,
+      );
+    }
+
+    // The vtable's second entry is the size of the table's inline fields; check that it fits in bounds.
+    const objectSize = bb.readUint16(vtableOffset + 2);
+    if (objectSize < 4) {
+      throw new Error(
+        `Table at offset ${offset} points to vtable at ${vtableOffset} (${offset} - ${offsetToVtable}), which specifies inline object size ${objectSize}, which should be at least 4 (vtable offset)`,
+      );
+    }
+    if (offset + objectSize > bb.capacity()) {
+      throw new Error(
+        `Table at offset ${offset} points to vtable at ${vtableOffset} (${offset} - ${offsetToVtable}), which specifies inline object size ${objectSize}, which would extend beyond the ByteBuffer (capacity ${bb.capacity()})`,
+      );
+    }
+  }
+
   // Constructs a Table object for the root of a ByteBuffer--this assumes that
   // the type of the Table is the root table of the Parser that you are using.
   static getRootTable(bb: ByteBuffer): Table {
-    return new Table(bb, -1, bb.readInt32(bb.position()) + bb.position());
+    if (bb.position() + 4 > bb.capacity()) {
+      throw new Error(
+        `Attempt to parse root table offset from ${bb.position()}, which would extend beyond ByteBuffer (capacity ${bb.capacity()})`,
+      );
+    }
+    // Additional bounds checks happen in the Table constructor
+    return new Table(bb, -1, bb.readUint32(bb.position()) + bb.position());
   }
   // Constructs a table from a type name instead of from a type index.
   static getNamedTable(
@@ -151,6 +202,12 @@ export class Table {
   }
   // Reads a scalar of a given type at a given offset.
   readScalar(fieldType: reflection.BaseType, offset: number): number | BigInt {
+    const size = typeSize(fieldType);
+    if (offset + size > this.bb.capacity()) {
+      throw new Error(
+        `Attempt to read scalar type ${fieldType} (size ${size}) at offset ${offset}, which would extend beyond ByteBuffer (capacity ${this.bb.capacity()})`,
+      );
+    }
     switch (fieldType) {
       case reflection.BaseType.UType:
       case reflection.BaseType.Bool:
@@ -444,9 +501,11 @@ export class Parser {
       let result: (number | BigInt)[] | Uint8Array;
       // If the vector is a byte vector, we can return a slice into the buffer
       if (isUByteVector) {
-        result = new Uint8Array(table.bb.bytes().buffer,
-                                table.bb.bytes().byteOffset + baseOffset,
-                                numElements);
+        result = new Uint8Array(
+          table.bb.bytes().buffer,
+          table.bb.bytes().byteOffset + baseOffset,
+          numElements,
+        );
       } else {
         result = [];
         for (let ii = 0; ii < numElements; ++ii) {

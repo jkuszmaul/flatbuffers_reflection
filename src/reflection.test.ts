@@ -102,15 +102,107 @@ describe("parseReflectionSchema", () => {
     const backingBuffer = new Uint8Array(builder.asUint8Array().length + paddingLength);
     backingBuffer.set(new Array(paddingLength).fill(0));
     backingBuffer.set(builder.asUint8Array(), paddingLength);
-    const byteVectorBB =
-        new ByteBuffer(new Uint8Array(backingBuffer.buffer, paddingLength,
-                                      backingBuffer.length - paddingLength));
+    const byteVectorBB = new ByteBuffer(
+      new Uint8Array(backingBuffer.buffer, paddingLength, backingBuffer.length - paddingLength),
+    );
     const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/ByteVector.bfbs`));
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
     const byteVectorObject = parser.toObject(table);
     expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("rejects invalid table offsets and vtables", () => {
+    expect(() => Table.getRootTable(new ByteBuffer(new Uint8Array([6, 0, 0])))).toThrow(
+      "Attempt to parse root table offset from 0, which would extend beyond ByteBuffer (capacity 3)",
+    );
+
+    expect(() =>
+      Table.getRootTable(new ByteBuffer(new Uint8Array([6, 0, 0, 0, 0, 0, 0, 0]))),
+    ).toThrow(
+      "Attempt to construct Table with offset 6, which would extend beyond ByteBuffer (capacity 8)",
+    );
+
+    expect(() =>
+      Table.getRootTable(new ByteBuffer(new Uint8Array([4, 0, 0, 0, 5, 0, 0, 0]))),
+    ).toThrow(
+      "Table at offset 4 points to vtable at -1 (4 - 5), which would extend beyond the ByteBuffer (capacity 8)",
+    );
+
+    expect(() =>
+      Table.getRootTable(new ByteBuffer(new Uint8Array([4, 0, 0, 0, 255, 255, 255, 255]))),
+    ).toThrow(
+      "Table at offset 4 points to vtable at 5 (4 - -1), which would extend beyond the ByteBuffer (capacity 8)",
+    );
+
+    expect(() =>
+      Table.getRootTable(
+        new ByteBuffer(new Uint8Array([4, 0, 0, 0, 252, 255, 255, 255, 3, 0, 0, 0])),
+      ),
+    ).toThrow(
+      "Table at offset 4 points to vtable at 8 (4 - -4), which specifies vtable size 3, which should be at least 4 (vtable size + object size)",
+    );
+
+    expect(() =>
+      Table.getRootTable(
+        new ByteBuffer(new Uint8Array([4, 0, 0, 0, 252, 255, 255, 255, 5, 0, 0, 0])),
+      ),
+    ).toThrow(
+      "Table at offset 4 points to vtable at 8 (4 - -4), which specifies vtable size 5, which would extend beyond the ByteBuffer (capacity 12)",
+    );
+
+    expect(() =>
+      Table.getRootTable(
+        new ByteBuffer(new Uint8Array([4, 0, 0, 0, 252, 255, 255, 255, 4, 0, 1, 0])),
+      ),
+    ).toThrow(
+      "Table at offset 4 points to vtable at 8 (4 - -4), which specifies inline object size 1, which should be at least 4 (vtable offset)",
+    );
+
+    expect(() =>
+      Table.getRootTable(
+        new ByteBuffer(new Uint8Array([4, 0, 0, 0, 252, 255, 255, 255, 4, 0, 9, 0])),
+      ),
+    ).toThrow(
+      "Table at offset 4 points to vtable at 8 (4 - -4), which specifies inline object size 9, which would extend beyond the ByteBuffer (capacity 12)",
+    );
+
+    expect(() =>
+      Table.getRootTable(
+        new ByteBuffer(new Uint8Array([4, 0, 0, 0, 252, 255, 255, 255, 4, 0, 8, 0])),
+      ),
+    ).not.toThrow();
+  });
+
+  it("performs bounds checking for scalars", () => {
+    const reflectionSchemaBuffer = readFileSync(`${__dirname}/reflection.bfbs`);
+    const schema = Schema.getRootAsSchema(new ByteBuffer(reflectionSchemaBuffer));
+    const parser = new Parser(schema);
+
+    const builder = new Builder();
+    const docOffsets = [builder.createString("abc"), builder.createString("def")];
+    const docVector = EnumVal.createDocumentationVector(builder, docOffsets);
+    const nameOffset = builder.createString("name");
+    Type.startType(builder);
+    Type.addBaseType(builder, BaseType.Int);
+    Type.addIndex(builder, 123);
+    const typeOffset = Type.endType(builder);
+    EnumVal.startEnumVal(builder);
+    EnumVal.addName(builder, nameOffset);
+    EnumVal.addValue(builder, BigInt(Number.MAX_SAFE_INTEGER) + BigInt(1));
+    EnumVal.addDocumentation(builder, docVector);
+    EnumVal.addUnionType(builder, typeOffset);
+    builder.finish(EnumVal.endEnumVal(builder));
+    const array = builder.asUint8Array();
+
+    array[12] = 255;
+    const fbBuffer = new ByteBuffer(array);
+
+    const reflectionFb = Table.getNamedTable(fbBuffer, schema, "reflection.EnumVal");
+    expect(() => parser.toObject(reflectionFb)).toThrow(
+      "Attempt to read scalar type 9 (size 8) at offset 275, which would extend beyond ByteBuffer (capacity 112)",
+    );
   });
 });
 

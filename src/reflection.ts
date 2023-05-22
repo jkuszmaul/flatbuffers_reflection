@@ -250,6 +250,10 @@ export class Table {
 // 1) Call toObject(), which turns the entire table into a javascript object.
 //    This is not meant to be particularly fast, but is useful to, e.g.,
 //    convert something to JSON, or as a debugging tool.
+// 2) Call toObjectLambda() to get a function that lets you do the same thing
+//    as toObject(), except that it preloads all the reflection-related work.
+//    Note that this still deserializes the entire object, which may be
+//    overkill for your application if you care about performance.
 // 2) Use the read*Lambda() accessors: These return a function that lets you
 //    access the specified field given a table. This is used by the plotter
 //    to repeatedly access the same field on a bunch of tables of the same type,
@@ -260,14 +264,9 @@ export class Table {
 export class Parser {
   constructor(private readonly schema: reflection.Schema) {}
 
-  // Parse a Table to a javascript object. This is can be used, e.g., to convert
-  // a flatbuffer Table to JSON.
-  // If readDefaults is set to true, then scalar fields will be filled out with
-  // their default values if not populated; if readDefaults is false and the
-  // field is not populated, the resulting object will not populate the field.
-  toObject(table: Table, readDefaults = false): Record<string, any> {
-    const result: Record<string, any> = {};
-    const schema = this.getType(table.typeIndex);
+  toObjectLambda(typeIndex: number, readDefaults = false): (t: Table) => Record<string, any> {
+    const lambdas: Record<string, any> = {};
+    const schema = this.getType(typeIndex);
     const numFields = schema.fieldsLength();
     for (let ii = 0; ii < numFields; ++ii) {
       const field = schema.fields(ii);
@@ -283,41 +282,68 @@ export class Parser {
         throw new Error('Malformed schema: "name" field of Field not populated.');
       }
       const baseType = fieldType.baseType();
-      let fieldValue = null;
       if (isScalar(baseType)) {
-        fieldValue = this.readScalar(table, fieldName, readDefaults);
+        lambdas[fieldName] = this.readScalarLambda(typeIndex, fieldName, readDefaults);
       } else if (baseType === reflection.BaseType.String) {
-        fieldValue = this.readString(table, fieldName);
+        lambdas[fieldName] = this.readStringLambda(typeIndex, fieldName);
       } else if (baseType === reflection.BaseType.Obj) {
-        const subTable = this.readTable(table, fieldName);
-        if (subTable !== null) {
-          fieldValue = this.toObject(subTable, readDefaults);
-        }
+        const rawLambda = this.readTableLambda(typeIndex, fieldName);
+        const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
+        lambdas[fieldName] = (t: Table) => {
+          const subTable = rawLambda(t);
+          if (subTable === null) {
+            return null;
+          }
+          return subTableLambda(subTable);
+        };
       } else if (baseType === reflection.BaseType.Vector) {
         const elementType = fieldType.element();
         if (isScalar(elementType)) {
-          fieldValue = this.readVectorOfScalars(table, fieldName);
+          lambdas[fieldName] = this.readVectorOfScalarsLambda(typeIndex, fieldName);
         } else if (elementType === reflection.BaseType.String) {
-          fieldValue = this.readVectorOfStrings(table, fieldName);
+          lambdas[fieldName] = this.readVectorOfStringsLambda(typeIndex, fieldName);
         } else if (elementType === reflection.BaseType.Obj) {
-          const tables = this.readVectorOfTables(table, fieldName);
-          if (tables !== null) {
-            fieldValue = [];
-            for (const subTable of tables) {
-              fieldValue.push(this.toObject(subTable, readDefaults));
+          const vectorLambda = this.readVectorOfTablesLambda(typeIndex, fieldName);
+          const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
+          lambdas[fieldName] = (t: Table) => {
+            const vector = vectorLambda(t);
+            if (vector === null) {
+              return null;
             }
-          }
+            const result = [];
+            for (const table of vector) {
+              result.push(subTableLambda(table));
+            }
+            return result;
+          };
         } else {
           throw new Error("Vectors of Unions and Arrays are not supported.");
         }
       } else {
         throw new Error("Unions and Arrays are not supported in field " + field.name());
       }
-      if (fieldValue !== null) {
-        result[fieldName] = fieldValue;
-      }
     }
-    return result;
+    return (t: Table) => {
+      const obj: Record<string, any> = {};
+      // Go through and attempt to use every single field accessor; return the
+      // resulting object.
+      for (const field in lambdas) {
+        const value = lambdas[field](t);
+        if (value !== null) {
+          obj[field] = value;
+        }
+      }
+      return obj;
+    };
+  }
+
+  // Parse a Table to a javascript object. This is can be used, e.g., to convert
+  // a flatbuffer Table to JSON.
+  // If readDefaults is set to true, then scalar fields will be filled out with
+  // their default values if not populated; if readDefaults is false and the
+  // field is not populated, the resulting object will not populate the field.
+  toObject(table: Table, readDefaults = false): Record<string, any> {
+    return this.toObjectLambda(table.typeIndex, readDefaults)(table);
   }
 
   // Returns the Object definition associated with the given type index.

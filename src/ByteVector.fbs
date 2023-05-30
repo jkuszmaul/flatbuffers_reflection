@@ -1,5 +1,9 @@
+struct NestedStruct {
+  a:int;
+}
 
 table ByteVector {
   data:[uint8];
+  nested_struct:NestedStruct;
 }
 root_type ByteVector;

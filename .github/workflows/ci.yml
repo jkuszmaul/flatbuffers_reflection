@@ -21,9 +21,22 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: yarn
 
+      - uses: bazelbuild/setup-bazelisk@v2
+      - name: Mount bazel cache  # Optional
+        uses: actions/cache@v3
+        with:
+          path: "~/.cache/bazel"
+          key: bazel
+
+      # Functionally a linting step.
+      # Note: This may be overly brittle depending on how stable the flatc
+      # compiler is.
+      - run: bazel run //:generate_files
+
       - run: yarn install --frozen-lockfile
 
       - run: yarn run build
       #TODO(jkuszmaul): Reenable linting.
       #- run: yarn run lint
       - run: yarn run test
+

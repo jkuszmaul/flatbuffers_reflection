@@ -1,7 +1,7 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Parser, Table } from "./reflection";
 import { BaseType, EnumVal, Schema, Type } from "./reflection_generated";
-import { ByteVector } from "./ByteVector_generated";
+import { ByteVector, NestedStruct } from "./test/ByteVector";
 import { readFileSync } from "fs";
 function stringify(obj: any): string {
   return JSON.stringify(obj, (_, value) => (typeof value === "bigint" ? value.toString() : value));
@@ -84,12 +84,28 @@ describe("parseReflectionSchema", () => {
     // essentially need to make sure byteVectorBB.bytes().buffer !== builder.asUint8Array().buffer
     const byteVectorBB = new ByteBuffer(Uint8Array.from(builder.asUint8Array()));
 
-    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/ByteVector.bfbs`));
+    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/test/ByteVector.bfbs`));
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
     const byteVectorObject = parser.toObject(table);
     expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+  });
+  it("reads flatbuffer structs", () => {
+    const builder = new Builder();
+    const struct = NestedStruct.createNestedStruct(builder, 971);
+    ByteVector.startByteVector(builder);
+    ByteVector.addNestedStruct(builder, struct);
+    const byteVector = ByteVector.endByteVector(builder);
+    builder.finish(byteVector);
+    const byteVectorBB = new ByteBuffer(Uint8Array.from(builder.asUint8Array()));
+
+    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/test/ByteVector.bfbs`));
+    const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
+    const parser = new Parser(rawSchema);
+    const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
+    const byteVectorObject = parser.toObject(table);
+    expect(byteVectorObject).toEqual({"nested_struct": {"a": 971}});
   });
   it("converts uint8 vectors to uint8arrays in an offset Uint8Array source", () => {
     const builder = new Builder();
@@ -105,7 +121,7 @@ describe("parseReflectionSchema", () => {
     const byteVectorBB = new ByteBuffer(
       new Uint8Array(backingBuffer.buffer, paddingLength, backingBuffer.length - paddingLength),
     );
-    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/ByteVector.bfbs`));
+    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/test/ByteVector.bfbs`));
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");

@@ -117,6 +117,8 @@ export class Table {
   // object that this is associated with.
   // offset is the absolute location within the buffer where the root of the
   // object is.
+  // isStruct indicates whether the object in question is a flatbuffers struct
+  //   or table (this is relevant for doing some memory bounds checks).
   // Note that a given Table assumes that it is being used with a particular
   // Schema object.
   // External users should generally not be using this constructor directly.
@@ -124,6 +126,7 @@ export class Table {
     public readonly bb: ByteBuffer,
     public readonly typeIndex: number,
     public readonly offset: number,
+    public readonly isStruct: boolean,
   ) {
     // See https://flatbuffers.dev/md__internals.html for format details.
 
@@ -132,6 +135,11 @@ export class Table {
       throw new Error(
         `Attempt to construct Table with offset ${offset}, which would extend beyond ByteBuffer (capacity ${bb.capacity()})`,
       );
+    }
+    if (isStruct) {
+      // If this is a struct, we don't have a vtable, so the below checks don't
+      // apply.
+      return;
     }
     // Check that the table's vtable could fit in bounds
     const offsetToVtable = bb.readInt32(offset);
@@ -172,6 +180,7 @@ export class Table {
 
   // Constructs a Table object for the root of a ByteBuffer--this assumes that
   // the type of the Table is the root table of the Parser that you are using.
+  // This assumes that the root table is a flatbuffers table, not a struct.
   static getRootTable(bb: ByteBuffer): Table {
     if (bb.position() + 4 > bb.capacity()) {
       throw new Error(
@@ -179,7 +188,8 @@ export class Table {
       );
     }
     // Additional bounds checks happen in the Table constructor
-    return new Table(bb, -1, bb.readUint32(bb.position()) + bb.position());
+    return new Table(bb, -1, bb.readUint32(bb.position()) + bb.position(),
+                     false);
   }
   // Constructs a table from a type name instead of from a type index.
   static getNamedTable(
@@ -191,11 +201,11 @@ export class Table {
     for (let ii = 0; ii < schema.objectsLength(); ++ii) {
       const schemaObject = schema.objects(ii);
       if (schemaObject !== null && schemaObject.name() === type) {
-        return new Table(
-          bb,
-          ii,
-          offset === undefined ? bb.readUint32(bb.position()) + bb.position() : offset,
-        );
+        return new Table(bb, ii,
+                         offset === undefined
+                             ? bb.readUint32(bb.position()) + bb.position()
+                             : offset,
+                         schemaObject.isStruct());
       }
     }
     throw new Error("Unable to find type " + type + " in schema.");
@@ -472,13 +482,14 @@ export class Parser {
       throw new Error("Field " + fieldName + " is not an object type.");
     }
 
+    const elementIsStruct = this.getType(fieldType.index()).isStruct();
+
     if (parentIsStruct) {
       return (t: Table) => {
-        return new Table(t.bb, fieldType.index(), t.offset + field.offset());
+        return new Table(t.bb, fieldType.index(), t.offset + field.offset(),
+                         elementIsStruct);
       };
     }
-
-    const elementIsStruct = this.getType(fieldType.index()).isStruct();
 
     return (table: Table) => {
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
@@ -487,7 +498,8 @@ export class Parser {
       }
 
       const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
-      return new Table(table.bb, fieldType.index(), objectStart);
+      return new Table(table.bb, fieldType.index(), objectStart,
+                       elementIsStruct);
     };
   }
   // Reads a vector of scalars (like readScalar, may return a vector of BigInt's
@@ -573,11 +585,13 @@ export class Parser {
       for (let ii = 0; ii < numElements; ++ii) {
         const elementOffset = baseOffset + elementSize * ii;
         result.push(
-          new Table(
-            table.bb,
-            fieldType.index(),
-            elementIsStruct ? elementOffset : table.bb.__indirect(elementOffset),
-          ),
+            new Table(
+                table.bb,
+                fieldType.index(),
+                elementIsStruct ? elementOffset
+                                : table.bb.__indirect(elementOffset),
+                elementIsStruct,
+                ),
         );
       }
       return result;

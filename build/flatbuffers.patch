@@ -1,0 +1,54 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index b4f015a0..2bfefc7e 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -8,8 +8,6 @@ package(
+     default_visibility = ["//visibility:public"],
+ )
+ 
+-npm_link_all_packages(name = "node_modules")
+-
+ npm_link_package(
+     name = "node_modules/flatbuffers",
+     src = "//ts:flatbuffers",
+diff --git a/build_defs.bzl b/build_defs.bzl
+index e2d21e45..fff23544 100644
+--- a/build_defs.bzl
++++ b/build_defs.bzl
+@@ -87,6 +87,7 @@ def flatbuffer_library_public(
+     optionally a Fileset([reflection_name]) with all generated reflection
+     binaries.
+     """
++    reflection_include_paths = include_paths
+     if include_paths == None:
+         include_paths = default_include_paths(flatc_path)
+     include_paths_cmd = ["-I %s" % (s) for s in include_paths]
+@@ -124,13 +125,16 @@ def flatbuffer_library_public(
+         **kwargs
+     )
+     if reflection_name:
++        if reflection_include_paths == None:
++            reflection_include_paths = default_include_paths(TRUE_FLATC_PATH)
++        reflection_include_paths_cmd = ["-I %s" % (s) for s in reflection_include_paths]
+         reflection_genrule_cmd = " ".join([
+             "SRCS=($(SRCS));",
+             "for f in $${SRCS[@]:0:%s}; do" % len(srcs),
+             "$(location %s)" % (TRUE_FLATC_PATH),
+             "-b --schema",
+             " ".join(flatc_args),
+-            " ".join(include_paths_cmd),
++            " ".join(reflection_include_paths_cmd),
+             language_flag,
+             output_directory,
+             "$$f;",
+diff --git a/reflection/ts/BUILD.bazel b/reflection/ts/BUILD.bazel
+index 18ffd983..0b3dfbe9 100644
+--- a/reflection/ts/BUILD.bazel
++++ b/reflection/ts/BUILD.bazel
+@@ -10,5 +10,6 @@ genrule(
+ flatbuffer_ts_library(
+     name = "reflection_ts_fbs",
+     srcs = [":reflection.fbs"],
++    gen_reflections = True,
+     visibility = ["//visibility:public"],
+ )

@@ -23,4 +23,4 @@ external/com_github_google_flatbuffers/flatc --binary --schema -o ${BUILD_WORKSP
 # Subtle diffs in the .bfbs files will be hard to track; so long as the
 # generated typescript is stable, we are probably fine.
 cd ${BUILD_WORKSPACE_DIRECTORY}
-git diff --exit-code -- ':!*.bfbs'
+git diff --exit-code -- ':!*.bfbs' ':!*lock*'

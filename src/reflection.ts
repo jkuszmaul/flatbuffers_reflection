@@ -82,33 +82,6 @@ function isScalar(baseType: reflection.BaseType): boolean {
   return false;
 }
 
-// Returns whether the given type is integer or not.
-function isInteger(baseType: reflection.BaseType): boolean {
-  switch (baseType) {
-    case reflection.BaseType.UType:
-    case reflection.BaseType.Bool:
-    case reflection.BaseType.Byte:
-    case reflection.BaseType.UByte:
-    case reflection.BaseType.Short:
-    case reflection.BaseType.UShort:
-    case reflection.BaseType.Int:
-    case reflection.BaseType.UInt:
-    case reflection.BaseType.Long:
-    case reflection.BaseType.ULong:
-      return true;
-    case reflection.BaseType.Float:
-    case reflection.BaseType.Double:
-    case reflection.BaseType.None:
-    case reflection.BaseType.String:
-    case reflection.BaseType.Vector:
-    case reflection.BaseType.Obj:
-    case reflection.BaseType.Union:
-    case reflection.BaseType.Array:
-      return false;
-  }
-  return false;
-}
-
 // Stores the data associated with a Table within a given buffer.
 export class Table {
   // Wrapper to represent an object (Table or Struct) within a ByteBuffer.
@@ -188,8 +161,7 @@ export class Table {
       );
     }
     // Additional bounds checks happen in the Table constructor
-    return new Table(bb, -1, bb.readUint32(bb.position()) + bb.position(),
-                     false);
+    return new Table(bb, -1, bb.readUint32(bb.position()) + bb.position(), false);
   }
   // Constructs a table from a type name instead of from a type index.
   static getNamedTable(
@@ -201,17 +173,18 @@ export class Table {
     for (let ii = 0; ii < schema.objectsLength(); ++ii) {
       const schemaObject = schema.objects(ii);
       if (schemaObject !== null && schemaObject.name() === type) {
-        return new Table(bb, ii,
-                         offset === undefined
-                             ? bb.readUint32(bb.position()) + bb.position()
-                             : offset,
-                         schemaObject.isStruct());
+        return new Table(
+          bb,
+          ii,
+          offset === undefined ? bb.readUint32(bb.position()) + bb.position() : offset,
+          schemaObject.isStruct(),
+        );
       }
     }
     throw new Error("Unable to find type " + type + " in schema.");
   }
   // Reads a scalar of a given type at a given offset.
-  readScalar(fieldType: reflection.BaseType, offset: number): number | BigInt {
+  readScalar(fieldType: reflection.BaseType, offset: number): number | bigint | boolean {
     const size = typeSize(fieldType);
     if (offset < 0 || offset + size > this.bb.capacity()) {
       throw new Error(
@@ -219,11 +192,11 @@ export class Table {
       );
     }
     switch (fieldType) {
-      case reflection.BaseType.UType:
       case reflection.BaseType.Bool:
-        return this.bb.readUint8(offset);
+        return this.bb.readUint8(offset) !== 0;
       case reflection.BaseType.Byte:
         return this.bb.readInt8(offset);
+      case reflection.BaseType.UType:
       case reflection.BaseType.UByte:
         return this.bb.readUint8(offset);
       case reflection.BaseType.Short:
@@ -397,8 +370,12 @@ export class Parser {
   // is set to false and the field is unset, we will return null. If
   // readDefaults is true and the field is unset, we will look-up the default
   // value for the field and return that.
-  // For 64-bit fields, returns a flatbuffer Long rather than a standard number.
-  readScalar(table: Table, fieldName: string, readDefaults = false): number | BigInt | null {
+  // For 64-bit fields, returns a BigInt rather than a standard number.
+  readScalar(
+    table: Table,
+    fieldName: string,
+    readDefaults = false,
+  ): number | bigint | boolean | null {
     return this.readScalarLambda(table.typeIndex, fieldName, readDefaults)(table);
   }
   // Like readScalar(), except that this returns an accessor for the specified
@@ -409,7 +386,7 @@ export class Parser {
     typeIndex: number,
     fieldName: string,
     readDefaults = false,
-  ): (t: Table) => number | BigInt | null {
+  ): (t: Table) => number | bigint | boolean | null {
     const field = this.getField(fieldName, typeIndex);
     const fieldType = field.type();
     if (fieldType === null) {
@@ -433,10 +410,25 @@ export class Parser {
         if (!readDefaults) {
           return null;
         }
-        if (isInteger(fieldType.baseType())) {
-          return field.defaultInteger();
-        } else {
-          return field.defaultReal();
+        switch (fieldType.baseType()) {
+          case reflection.BaseType.Bool:
+            return field.defaultInteger() !== 0n;
+          case reflection.BaseType.Long:
+          case reflection.BaseType.ULong:
+            return field.defaultInteger();
+          case reflection.BaseType.UType:
+          case reflection.BaseType.Byte:
+          case reflection.BaseType.UByte:
+          case reflection.BaseType.Short:
+          case reflection.BaseType.UShort:
+          case reflection.BaseType.Int:
+          case reflection.BaseType.UInt:
+            return Number(field.defaultInteger());
+          case reflection.BaseType.Float:
+          case reflection.BaseType.Double:
+            return field.defaultReal();
+          default:
+            throw new Error(`Expected scalar type, found ${fieldType.baseType()}`);
         }
       }
       return t.readScalar(fieldType.baseType(), offset);
@@ -486,8 +478,7 @@ export class Parser {
 
     if (parentIsStruct) {
       return (t: Table) => {
-        return new Table(t.bb, fieldType.index(), t.offset + field.offset(),
-                         elementIsStruct);
+        return new Table(t.bb, fieldType.index(), t.offset + field.offset(), elementIsStruct);
       };
     }
 
@@ -498,20 +489,22 @@ export class Parser {
       }
 
       const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
-      return new Table(table.bb, fieldType.index(), objectStart,
-                       elementIsStruct);
+      return new Table(table.bb, fieldType.index(), objectStart, elementIsStruct);
     };
   }
   // Reads a vector of scalars (like readScalar, may return a vector of BigInt's
   // instead). Also, will return null if the vector is not set.
-  readVectorOfScalars(table: Table, fieldName: string): (number | BigInt)[] | Uint8Array | null {
+  readVectorOfScalars(
+    table: Table,
+    fieldName: string,
+  ): (number | bigint | boolean)[] | Uint8Array | null {
     return this.readVectorOfScalarsLambda(table.typeIndex, fieldName)(table);
   }
 
   readVectorOfScalarsLambda(
     typeIndex: number,
     fieldName: string,
-  ): (t: Table) => (number | BigInt)[] | Uint8Array | null {
+  ): (t: Table) => (number | bigint | boolean)[] | Uint8Array | null {
     const field = this.getField(fieldName, typeIndex);
     const fieldType = field.type();
     if (fieldType === null) {
@@ -536,7 +529,7 @@ export class Parser {
       const baseOffset = table.bb.__vector(offsetToOffset);
       const scalarSize = typeSize(fieldType.element());
 
-      let result: (number | BigInt)[] | Uint8Array;
+      let result: (number | bigint | boolean)[] | Uint8Array;
       // If the vector is a byte vector, we can return a slice into the buffer
       if (isUByteVector) {
         result = new Uint8Array(
@@ -585,13 +578,12 @@ export class Parser {
       for (let ii = 0; ii < numElements; ++ii) {
         const elementOffset = baseOffset + elementSize * ii;
         result.push(
-            new Table(
-                table.bb,
-                fieldType.index(),
-                elementIsStruct ? elementOffset
-                                : table.bb.__indirect(elementOffset),
-                elementIsStruct,
-                ),
+          new Table(
+            table.bb,
+            fieldType.index(),
+            elementIsStruct ? elementOffset : table.bb.__indirect(elementOffset),
+            elementIsStruct,
+          ),
         );
       }
       return result;

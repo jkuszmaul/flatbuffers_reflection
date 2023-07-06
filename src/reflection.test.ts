@@ -1,11 +1,8 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Parser, Table } from "./reflection";
-import { BaseType, EnumVal, Schema, Type } from "./reflection_generated";
+import { BaseType, EnumVal, Field, Schema, Type } from "./reflection_generated";
 import { ByteVector, NestedStruct } from "./test/ByteVector";
 import { readFileSync } from "fs";
-function stringify(obj: any): string {
-  return JSON.stringify(obj, (_, value) => (typeof value === "bigint" ? value.toString() : value));
-}
 
 describe("parseReflectionSchema", () => {
   it("Reads reflection table", () => {
@@ -48,26 +45,59 @@ describe("parseReflectionSchema", () => {
       EnumVal.addName(builder, nameOffset);
       // Make sure that we are testing an integer that will exceed the normal
       // precision bounds.
-      EnumVal.addValue(builder, BigInt(Number.MAX_SAFE_INTEGER) + BigInt(1));
+      EnumVal.addValue(builder, BigInt(Number.MAX_SAFE_INTEGER) + 2n);
       EnumVal.addDocumentation(builder, docVector);
       EnumVal.addUnionType(builder, typeOffset);
       builder.finish(EnumVal.endEnumVal(builder));
       const array = builder.asUint8Array();
       const fbBuffer = new ByteBuffer(array);
 
-      const reflectionFb = Table.getNamedTable(fbBuffer, schema, "reflection.EnumVal");
-      expect(
-        '{"documentation":["abc","def"],"name":"name","union_type":{"base_type":' +
-          BaseType.Int +
-          ',"index":123},"value":"9007199254740992"}',
-      ).toEqual(stringify(parser.toObject(reflectionFb)));
-      const typeFb = parser.readTable(reflectionFb, "union_type");
+      const enumTable = Table.getNamedTable(fbBuffer, schema, "reflection.EnumVal");
+      expect(parser.toObject(enumTable)).toEqual({
+        documentation: ["abc", "def"],
+        name: "name",
+        union_type: {
+          base_type: 7,
+          index: 123,
+        },
+        value: 9007199254740993n,
+      });
+      expect(parser.readScalar(enumTable, "value", false)).toBe(
+        BigInt(Number.MAX_SAFE_INTEGER) + 2n,
+      );
+      const typeFb = parser.readTable(enumTable, "union_type");
       if (typeFb === null) {
         throw new Error();
       }
+      expect(parser.readScalar(typeFb, "index", false)).toBe(123);
       // Confirm that readDefaults works.
-      expect(BigInt(4)).toEqual(parser.readScalar(typeFb, "base_size", true));
-      expect(null).toEqual(parser.readScalar(typeFb, "base_size", false));
+      expect(parser.readScalar(typeFb, "base_size", true)).toBe(4);
+      expect(parser.readScalar(typeFb, "base_size", false)).toBe(null);
+    }
+    {
+      const builder = new Builder();
+      Type.startType(builder);
+      Type.addBaseType(builder, BaseType.Int);
+      const typeOffset = Type.endType(builder);
+      const nameOffset = builder.createString("name");
+      Field.startField(builder);
+      Field.addName(builder, nameOffset);
+      Field.addType(builder, typeOffset);
+      Field.addOptional(builder, true);
+      builder.finish(Field.endField(builder));
+      const array = builder.asUint8Array();
+      const fbBuffer = new ByteBuffer(array);
+
+      const fieldTable = Table.getNamedTable(fbBuffer, schema, "reflection.Field");
+      expect(parser.readScalar(fieldTable, "deprecated", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "deprecated", true)).toBe(false);
+      expect(parser.readScalar(fieldTable, "optional")).toBe(true);
+      expect(parser.readScalar(fieldTable, "default_integer", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "default_integer", true)).toBe(0n);
+      expect(parser.readScalar(fieldTable, "default_real", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "default_real", true)).toBe(0);
+      expect(parser.readScalar(fieldTable, "padding", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "padding", true)).toBe(0);
     }
   });
   it("converts uint8 vectors to uint8arrays", () => {
@@ -84,7 +114,9 @@ describe("parseReflectionSchema", () => {
     // essentially need to make sure byteVectorBB.bytes().buffer !== builder.asUint8Array().buffer
     const byteVectorBB = new ByteBuffer(Uint8Array.from(builder.asUint8Array()));
 
-    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/test/ByteVector.bfbs`));
+    const byteVectorSchemaByteBuffer = new ByteBuffer(
+      readFileSync(`${__dirname}/test/ByteVector.bfbs`),
+    );
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
@@ -100,12 +132,14 @@ describe("parseReflectionSchema", () => {
     builder.finish(byteVector);
     const byteVectorBB = new ByteBuffer(Uint8Array.from(builder.asUint8Array()));
 
-    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/test/ByteVector.bfbs`));
+    const byteVectorSchemaByteBuffer = new ByteBuffer(
+      readFileSync(`${__dirname}/test/ByteVector.bfbs`),
+    );
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
     const byteVectorObject = parser.toObject(table);
-    expect(byteVectorObject).toEqual({"nested_struct": {"a": 971}});
+    expect(byteVectorObject).toEqual({ nested_struct: { a: 971 } });
   });
   it("converts uint8 vectors to uint8arrays in an offset Uint8Array source", () => {
     const builder = new Builder();
@@ -121,7 +155,9 @@ describe("parseReflectionSchema", () => {
     const byteVectorBB = new ByteBuffer(
       new Uint8Array(backingBuffer.buffer, paddingLength, backingBuffer.length - paddingLength),
     );
-    const byteVectorSchemaByteBuffer = new ByteBuffer(readFileSync(`${__dirname}/test/ByteVector.bfbs`));
+    const byteVectorSchemaByteBuffer = new ByteBuffer(
+      readFileSync(`${__dirname}/test/ByteVector.bfbs`),
+    );
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");

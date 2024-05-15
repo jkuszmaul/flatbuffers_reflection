@@ -266,7 +266,7 @@ export class Parser {
       }
       const baseType = fieldType.baseType();
       if (isScalar(baseType)) {
-        lambdas[fieldName] = this.readScalarLambda(typeIndex, fieldName, readDefaults);
+        lambdas[fieldName] = this.readScalarLambdaWithField(field, typeIndex, readDefaults);
       } else if (baseType === reflection.BaseType.String) {
         lambdas[fieldName] = this.readStringLambda(typeIndex, fieldName);
       } else if (baseType === reflection.BaseType.Obj) {
@@ -378,6 +378,7 @@ export class Parser {
   ): number | bigint | boolean | null {
     return this.readScalarLambda(table.typeIndex, fieldName, readDefaults)(table);
   }
+
   // Like readScalar(), except that this returns an accessor for the specified
   // field, rather than the value of the field itself.
   // Note that the *Lambda() methods take a typeIndex instead of a Table, which
@@ -388,13 +389,25 @@ export class Parser {
     readDefaults = false,
   ): (t: Table) => number | bigint | boolean | null {
     const field = this.getField(fieldName, typeIndex);
+    return this.readScalarLambdaWithField(field, typeIndex, readDefaults);
+  }
+
+  // Like readScalar(), except that this returns an accessor for the specified
+  // field, rather than the value of the field itself.
+  // Note that the *Lambda() methods take a typeIndex instead of a Table, which
+  // can be obtained using table.typeIndex.
+  private readScalarLambdaWithField(
+    field: reflection.Field,
+    typeIndex: number,
+    readDefaults = false,
+  ): (t: Table) => number | bigint | boolean | null {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const isStruct = this.getType(typeIndex).isStruct();
     if (!isScalar(fieldType.baseType())) {
-      throw new Error("Field " + fieldName + " is not a scalar type.");
+      throw new Error("Field " + field.name() + " is not a scalar type.");
     }
 
     if (isStruct) {

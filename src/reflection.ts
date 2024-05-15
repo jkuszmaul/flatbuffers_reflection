@@ -315,7 +315,6 @@ export class Parser {
         // unpack is a thing, but is there a nicer way so I don't have to unpack the schema?
 
         const unionEnum = this.schema.enums(enumIndex);
-        console.log(unionEnum);
         if (!unionEnum) {
           throw new Error("Malformed schema: missing enum for union type");
         }
@@ -339,7 +338,7 @@ export class Parser {
             continue;
           }
 
-          const typeDeserializer = this.toObjectLambda(specificType.index(), readDefaults);
+          const typeDeserializer = this.toObjectLambda(typeIndex, readDefaults);
           unionDeserializers.set(Number(enumItem.value()), typeDeserializer);
         }
 
@@ -368,6 +367,8 @@ export class Parser {
           discriminatorfieldType.index(),
           readDefaults,
         );
+
+        console.log({ fieldName });
 
         lambdas[fieldName] = (table: Table) => {
           const discriminatorValue = scalar(table);

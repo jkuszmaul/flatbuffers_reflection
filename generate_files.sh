@@ -17,7 +17,7 @@ source "${RUNFILES_DIR:-/dev/null}/$f" 2>/dev/null || \
 external/com_github_google_flatbuffers/flatc --ts --ts-no-import-ext -o ${BUILD_WORKSPACE_DIRECTORY}/src/test/ src/ByteVector.fbs
 external/com_github_google_flatbuffers/flatc --binary --schema -o ${BUILD_WORKSPACE_DIRECTORY}/src/test/ src/ByteVector.fbs
 
-external/com_github_google_flatbuffers/flatc --ts --ts-no-import-ext -o ${BUILD_WORKSPACE_DIRECTORY}/src/test/ src/schemas/Union.fbs
+external/com_github_google_flatbuffers/flatc --ts --ts-no-import-ext --gen-object-api -o ${BUILD_WORKSPACE_DIRECTORY}/src/test/ src/schemas/Union.fbs
 external/com_github_google_flatbuffers/flatc --binary --schema -o ${BUILD_WORKSPACE_DIRECTORY}/src/test/ src/schemas/Union.fbs
 
 # TODO(jkuszmaul): Also codegen the reflection typescript code (I'm currently

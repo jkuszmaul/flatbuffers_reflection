@@ -2,7 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-export class Shield {
+
+
+export class Shield implements flatbuffers.IUnpackableObject<ShieldT> {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
   __init(i:number, bb:flatbuffers.ByteBuffer):Shield {
@@ -42,5 +44,29 @@ static createShield(builder:flatbuffers.Builder, protection:number):flatbuffers.
   Shield.startShield(builder);
   Shield.addProtection(builder, protection);
   return Shield.endShield(builder);
+}
+
+unpack(): ShieldT {
+  return new ShieldT(
+    this.protection()
+  );
+}
+
+
+unpackTo(_o: ShieldT): void {
+  _o.protection = this.protection();
+}
+}
+
+export class ShieldT implements flatbuffers.IGeneratedObject {
+constructor(
+  public protection: number = 0.0
+){}
+
+
+pack(builder:flatbuffers.Builder): flatbuffers.Offset {
+  return Shield.createShield(builder,
+    this.protection
+  );
 }
 }

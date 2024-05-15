@@ -2,9 +2,11 @@
 
 import * as flatbuffers from "flatbuffers";
 
-import { Equipment } from "./equipment";
+import { Equipment, unionToEquipment } from "./equipment";
+import { ShieldT } from "./shield";
+import { SwordT } from "./sword";
 
-export class Monster {
+export class Monster implements flatbuffers.IUnpackableObject<MonsterT> {
   bb: flatbuffers.ByteBuffer | null = null;
   bb_pos = 0;
   __init(i: number, bb: flatbuffers.ByteBuffer): Monster {
@@ -66,5 +68,42 @@ export class Monster {
     Monster.addEquippedType(builder, equippedType);
     Monster.addEquipped(builder, equippedOffset);
     return Monster.endMonster(builder);
+  }
+
+  unpack(): MonsterT {
+    return new MonsterT(
+      this.equippedType(),
+      (() => {
+        const temp = unionToEquipment(this.equippedType(), this.equipped.bind(this));
+        if (temp === null) {
+          return null;
+        }
+        return temp.unpack();
+      })(),
+    );
+  }
+
+  unpackTo(_o: MonsterT): void {
+    _o.equippedType = this.equippedType();
+    _o.equipped = (() => {
+      const temp = unionToEquipment(this.equippedType(), this.equipped.bind(this));
+      if (temp === null) {
+        return null;
+      }
+      return temp.unpack();
+    })();
+  }
+}
+
+export class MonsterT implements flatbuffers.IGeneratedObject {
+  constructor(
+    public equippedType: Equipment = Equipment.NONE,
+    public equipped: ShieldT | SwordT | null = null,
+  ) {}
+
+  pack(builder: flatbuffers.Builder): flatbuffers.Offset {
+    const equipped = builder.createObjectOffset(this.equipped);
+
+    return Monster.createMonster(builder, this.equippedType, equipped);
   }
 }

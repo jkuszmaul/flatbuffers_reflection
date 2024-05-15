@@ -12,8 +12,7 @@
   "module": "dist/esm/index.js",
   "main": "dist/cjs/index.js",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "clean": "rimraf dist *.tsbuildinfo",

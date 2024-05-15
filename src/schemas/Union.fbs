@@ -1,0 +1,16 @@
+table Sword {
+  name:string;
+  damage:short;
+}
+
+table Shield {
+  protection:float;
+}
+
+union Equipment { Sword, Shield }
+
+table Monster {
+  equipped:Equipment;
+}
+
+root_type Monster;

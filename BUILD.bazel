@@ -3,6 +3,7 @@ sh_binary(
     srcs = ["generate_files.sh"],
     data = [
         "//src:ByteVector.fbs",
+        "//src:schemas/Union.fbs",
         "@com_github_google_flatbuffers//:flatc",
     ],
     deps = ["@bazel_tools//tools/bash/runfiles"],

@@ -2,6 +2,7 @@ import { Builder, ByteBuffer } from "flatbuffers";
 import { Parser, Table } from "./reflection";
 import { BaseType, EnumVal, Field, Schema, Type } from "./reflection_generated";
 import { ByteVector, NestedStruct } from "./test/ByteVector";
+import { Equipment, Monster, Shield } from "./test/Union";
 import { readFileSync } from "fs";
 
 describe("parseReflectionSchema", () => {
@@ -99,6 +100,22 @@ describe("parseReflectionSchema", () => {
       expect(parser.readScalar(fieldTable, "padding", false)).toBe(null);
       expect(parser.readScalar(fieldTable, "padding", true)).toBe(0);
     }
+  });
+  it.only("supports union types", () => {
+    const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/Union.bfbs`);
+    const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
+    const schema = Schema.getRootAsSchema(schemaByteBuffer);
+
+    const builder = new Builder();
+    const shieldOffset = Shield.createShield(builder, 23);
+    const offset = Monster.createMonster(builder, Equipment.Shield, shieldOffset);
+    builder.finish(offset);
+
+    const parser = new Parser(schema);
+    const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
+    const schemaObject = parser.toObject(table);
+
+    console.log(schemaObject);
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();

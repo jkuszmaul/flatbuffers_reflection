@@ -1,1 +1,1 @@
-exports_files(["ByteVector.fbs"])
+exports_files(["ByteVector.fbs", "schemas/Union.fbs"])

@@ -108,7 +108,7 @@ describe("parseReflectionSchema", () => {
 
     const monster = new MonsterT();
     monster.equipped = new ShieldT();
-    monster.equipped.protection = 27;
+    monster.equipped.protection = 27.3;
     monster.equippedType = Equipment.Shield;
 
     const builder = new Builder();

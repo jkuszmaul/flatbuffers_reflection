@@ -310,10 +310,6 @@ export class Parser {
         // For union types, the index points to the enum which has the valid types of the union
         const enumIndex = fieldType.index();
 
-        // how do I get the underlying enum values...
-        // because I need to then lookup the unionType in each enum value
-        // unpack is a thing, but is there a nicer way so I don't have to unpack the schema?
-
         const unionEnum = this.schema.enums(enumIndex);
         if (!unionEnum) {
           throw new Error("Malformed schema: missing enum for union type");

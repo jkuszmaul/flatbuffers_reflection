@@ -16,7 +16,7 @@
 
 import { ByteBuffer } from "flatbuffers";
 
-import * as reflection from "./gen/reflection_generated";
+import * as reflection from "./vendor/gen/reflection_generated";
 
 // Returns the size, in bytes, of the given type. For vectors/strings/etc.
 // returns the size of the offset.

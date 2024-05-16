@@ -120,6 +120,10 @@ describe("parseReflectionSchema", () => {
 
     console.log(schemaObject);
     expect(schemaObject).toEqual({ equipped: { protection: 27.5 } });
+
+    // todo vectors of union
+    // union aliases
+    // union with table that also uses union
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();

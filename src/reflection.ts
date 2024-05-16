@@ -300,8 +300,6 @@ export class Parser {
             return result;
           };
         } else if (elementType === reflection.BaseType.Union) {
-          // for a vector of union
-
           // for a vector of union we also have the sidecar _type_ field
           // this has the discriminator values for each
 
@@ -355,15 +353,14 @@ export class Parser {
             throw new Error(`Malformed schema: union discriminator field is not an array`);
           }
 
+          discriminatorfieldType.element();
+
           const name = unionDiscriminator.name();
           if (!name) {
             throw new Error("changeme");
           }
 
-          const readDiscriminators = this.readVectorOfScalarsLambda(
-            discriminatorfieldType.index(),
-            name,
-          );
+          const readDiscriminators = this.readVectorOfScalarsLambdaField(unionDiscriminator);
 
           const vectorLambda = this.readVectorOfTablesLambda(typeIndex, fieldName);
 
@@ -404,7 +401,7 @@ export class Parser {
             return result;
           };
         } else {
-          throw new Error("Vectors of Unions and Arrays are not supported.");
+          throw new Error("Vectors of Arrays are not supported.");
         }
       } else if (baseType === reflection.BaseType.Union) {
         // For union types, the index points to the enum which has the valid types of the union
@@ -700,6 +697,51 @@ export class Parser {
     fieldName: string,
   ): (number | bigint | boolean)[] | Uint8Array | null {
     return this.readVectorOfScalarsLambda(table.typeIndex, fieldName)(table);
+  }
+
+  readVectorOfScalarsLambdaField(
+    field: reflection.Field,
+  ): (t: Table) => (number | bigint | boolean)[] | Uint8Array | null {
+    const fieldName = field.name();
+    const fieldType = field.type();
+    if (fieldType === null) {
+      throw new Error('Malformed schema: "type" field of Field not populated.');
+    }
+    if (fieldType.baseType() !== reflection.BaseType.Vector) {
+      throw new Error("Field " + fieldName + " is not an vector.");
+    }
+    const elementType = fieldType.element();
+    if (!isScalar(elementType)) {
+      throw new Error("Field " + fieldName + " is not an vector of scalars.");
+    }
+    const isUByteVector = elementType === reflection.BaseType.UByte;
+
+    return (table: Table) => {
+      const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
+      if (offsetToOffset === table.offset) {
+        return null;
+      }
+
+      const numElements = table.bb.__vector_len(offsetToOffset);
+      const baseOffset = table.bb.__vector(offsetToOffset);
+      const scalarSize = typeSize(fieldType.element());
+
+      let result: (number | bigint | boolean)[] | Uint8Array;
+      // If the vector is a byte vector, we can return a slice into the buffer
+      if (isUByteVector) {
+        result = new Uint8Array(
+          table.bb.bytes().buffer,
+          table.bb.bytes().byteOffset + baseOffset,
+          numElements,
+        );
+      } else {
+        result = [];
+        for (let ii = 0; ii < numElements; ++ii) {
+          result.push(table.readScalar(fieldType.element(), baseOffset + scalarSize * ii));
+        }
+      }
+      return result;
+    };
   }
 
   readVectorOfScalarsLambda(

@@ -101,12 +101,14 @@ describe("parseReflectionSchema", () => {
       expect(parser.readScalar(fieldTable, "padding", true)).toBe(0);
     }
   });
-  it.only("supports union types", () => {
+  it("supports union types", () => {
     const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/Union.bfbs`);
     const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
     const schema = Schema.getRootAsSchema(schemaByteBuffer);
 
     const builder = new Builder();
+
+    const primaryDecoratorOffset = Arms.createArms(builder, 12);
 
     const gemstoneOffset = Gemstone.createGemstone(builder, 1.02337);
     const skullOffset = Skull.createSkull(builder, builder.createString("some-name"));
@@ -115,8 +117,6 @@ describe("parseReflectionSchema", () => {
       ShieldDecorator.Skull,
     ]);
     const decoratorsOffset = Shield.createDecoratorsVector(builder, [gemstoneOffset, skullOffset]);
-
-    const primaryDecoratorOffset = Arms.createArms(builder, 12);
 
     const shieldOffset = Shield.createShield(
       builder,

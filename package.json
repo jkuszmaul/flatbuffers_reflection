@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "clean": "rimraf dist *.tsbuildinfo",
-    "prepack": "tsc -b tsconfig.json tsconfig.cjs.json",
+    "prepack": "yarn build",
     "build": "tsc -b tsconfig.json tsconfig.cjs.json",
     "lint": "eslint --report-unused-disable-directives --fix .",
     "test": "jest"

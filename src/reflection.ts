@@ -262,11 +262,11 @@ export class Parser {
       }
       const baseType = fieldType.baseType();
       if (isScalar(baseType)) {
-        lambdas[fieldName] = this.readScalarLambdaWithField(field, typeIndex, readDefaults);
+        lambdas[fieldName] = this.readScalarLambda(field, typeIndex, readDefaults);
       } else if (baseType === reflection.BaseType.String) {
-        lambdas[fieldName] = this.readStringLambda(typeIndex, fieldName);
+        lambdas[fieldName] = this.readStringLambda(field);
       } else if (baseType === reflection.BaseType.Obj) {
-        const rawLambda = this.readTableLambda(typeIndex, fieldName);
+        const rawLambda = this.readTableLambda(field, typeIndex);
         const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
         lambdas[fieldName] = (t: Table) => {
           const subTable = rawLambda(t);
@@ -278,11 +278,11 @@ export class Parser {
       } else if (baseType === reflection.BaseType.Vector) {
         const elementType = fieldType.element();
         if (isScalar(elementType)) {
-          lambdas[fieldName] = this.readVectorOfScalarsLambda(typeIndex, fieldName);
+          lambdas[fieldName] = this.readVectorOfScalarsLambda(field);
         } else if (elementType === reflection.BaseType.String) {
-          lambdas[fieldName] = this.readVectorOfStringsLambda(typeIndex, fieldName);
+          lambdas[fieldName] = this.readVectorOfStringsLambda(field);
         } else if (elementType === reflection.BaseType.Obj) {
-          const vectorLambda = this.readVectorOfTablesLambda(typeIndex, fieldName);
+          const vectorLambda = this.readVectorOfTablesLambda(field);
           const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
           lambdas[fieldName] = (t: Table) => {
             const vector = vectorLambda(t);
@@ -374,7 +374,8 @@ export class Parser {
     fieldName: string,
     readDefaults = false,
   ): number | bigint | boolean | null {
-    return this.readScalarLambda(table.typeIndex, fieldName, readDefaults)(table);
+    const field = this.getField(fieldName, table.typeIndex);
+    return this.readScalarLambda(field, table.typeIndex, readDefaults)(table);
   }
 
   // Like readScalar(), except that this returns an accessor for the specified
@@ -382,19 +383,6 @@ export class Parser {
   // Note that the *Lambda() methods take a typeIndex instead of a Table, which
   // can be obtained using table.typeIndex.
   readScalarLambda(
-    typeIndex: number,
-    fieldName: string,
-    readDefaults = false,
-  ): (t: Table) => number | bigint | boolean | null {
-    const field = this.getField(fieldName, typeIndex);
-    return this.readScalarLambdaWithField(field, typeIndex, readDefaults);
-  }
-
-  // Like readScalar(), except that this returns an accessor for the specified
-  // field, rather than the value of the field itself.
-  // Note that the *Lambda() methods take a typeIndex instead of a Table, which
-  // can be obtained using table.typeIndex.
-  readScalarLambdaWithField(
     field: reflection.Field,
     typeIndex: number,
     readDefaults = false,
@@ -448,17 +436,17 @@ export class Parser {
   // Reads a string with the given field name from the provided Table.
   // If the field is unset, returns null.
   readString(table: Table, fieldName: string): string | null {
-    return this.readStringLambda(table.typeIndex, fieldName)(table);
+    const field = this.getField(fieldName, table.typeIndex);
+    return this.readStringLambda(field)(table);
   }
 
-  readStringLambda(typeIndex: number, fieldName: string): (t: Table) => string | null {
-    const field = this.getField(fieldName, typeIndex);
+  readStringLambda(field: reflection.Field): (t: Table) => string | null {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.String) {
-      throw new Error("Field " + fieldName + " is not a string.");
+      throw new Error("Field " + field.name() + " is not a string.");
     }
 
     return (t: Table) => {
@@ -472,17 +460,17 @@ export class Parser {
   // Reads a sub-message from the given Table. The sub-message may either be
   // a struct or a Table. Returns null if the sub-message is not set.
   readTable(table: Table, fieldName: string): Table | null {
-    return this.readTableLambda(table.typeIndex, fieldName)(table);
+    const field = this.getField(fieldName, table.typeIndex);
+    return this.readTableLambda(field, table.typeIndex)(table);
   }
-  readTableLambda(typeIndex: number, fieldName: string): (t: Table) => Table | null {
-    const field = this.getField(fieldName, typeIndex);
+  readTableLambda(field: reflection.Field, typeIndex: number): (t: Table) => Table | null {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const parentIsStruct = this.getType(typeIndex).isStruct();
     if (fieldType.baseType() !== reflection.BaseType.Obj) {
-      throw new Error("Field " + fieldName + " is not an object type.");
+      throw new Error("Field " + field.name() + " is not an object type.");
     }
 
     const elementIsStruct = this.getType(fieldType.index()).isStruct();
@@ -509,24 +497,23 @@ export class Parser {
     table: Table,
     fieldName: string,
   ): (number | bigint | boolean)[] | Uint8Array | null {
-    return this.readVectorOfScalarsLambda(table.typeIndex, fieldName)(table);
+    const field = this.getField(fieldName, table.typeIndex);
+    return this.readVectorOfScalarsLambda(field)(table);
   }
 
   readVectorOfScalarsLambda(
-    typeIndex: number,
-    fieldName: string,
+    field: reflection.Field,
   ): (t: Table) => (number | bigint | boolean)[] | Uint8Array | null {
-    const field = this.getField(fieldName, typeIndex);
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
-      throw new Error("Field " + fieldName + " is not an vector.");
+      throw new Error("Field " + field.name() + " is not an vector.");
     }
     const elementType = fieldType.element();
     if (!isScalar(elementType)) {
-      throw new Error("Field " + fieldName + " is not an vector of scalars.");
+      throw new Error("Field " + field.name() + " is not an vector of scalars.");
     }
     const isUByteVector = elementType === reflection.BaseType.UByte;
 
@@ -559,19 +546,19 @@ export class Parser {
   }
   // Reads a vector of tables. Returns null if vector is not set.
   readVectorOfTables(table: Table, fieldName: string): Table[] | null {
-    return this.readVectorOfTablesLambda(table.typeIndex, fieldName)(table);
+    const field = this.getField(fieldName, table.typeIndex);
+    return this.readVectorOfTablesLambda(field)(table);
   }
-  readVectorOfTablesLambda(typeIndex: number, fieldName: string): (t: Table) => Table[] | null {
-    const field = this.getField(fieldName, typeIndex);
+  readVectorOfTablesLambda(field: reflection.Field): (t: Table) => Table[] | null {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
-      throw new Error("Field " + fieldName + " is not an vector.");
+      throw new Error("Field " + field.name + " is not an vector.");
     }
     if (fieldType.element() !== reflection.BaseType.Obj) {
-      throw new Error("Field " + fieldName + " is not an vector of objects.");
+      throw new Error("Field " + field.name + " is not an vector of objects.");
     }
 
     const elementSchema = this.getType(fieldType.index());
@@ -602,19 +589,19 @@ export class Parser {
   }
   // Reads a vector of strings. Returns null if not set.
   readVectorOfStrings(table: Table, fieldName: string): string[] | null {
-    return this.readVectorOfStringsLambda(table.typeIndex, fieldName)(table);
+    const field = this.getField(fieldName, table.typeIndex);
+    return this.readVectorOfStringsLambda(field)(table);
   }
-  readVectorOfStringsLambda(typeIndex: number, fieldName: string): (t: Table) => string[] | null {
-    const field = this.getField(fieldName, typeIndex);
+  readVectorOfStringsLambda(field: reflection.Field): (t: Table) => string[] | null {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
-      throw new Error("Field " + fieldName + " is not an vector.");
+      throw new Error("Field " + field.name() + " is not an vector.");
     }
     if (fieldType.element() !== reflection.BaseType.String) {
-      throw new Error("Field " + fieldName + " is not an vector of strings.");
+      throw new Error("Field " + field.name() + " is not an vector of strings.");
     }
 
     return (table: Table) => {

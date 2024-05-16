@@ -1,0 +1,7 @@
+{
+  "extends": "@foxglove/tsconfig/base",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "newLine": "lf"
+  }
+}

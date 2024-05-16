@@ -1,0 +1,3 @@
+src/vendor/** linguist-vendored=true
+src/vendor/gen/** linguist-generated=true
+src/test/gen/** linguist-generated=true

@@ -555,10 +555,10 @@ export class Parser {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
-      throw new Error("Field " + field.name + " is not an vector.");
+      throw new Error("Field " + field.name() + " is not an vector.");
     }
     if (fieldType.element() !== reflection.BaseType.Obj) {
-      throw new Error("Field " + field.name + " is not an vector of objects.");
+      throw new Error("Field " + field.name() + " is not an vector of objects.");
     }
 
     const elementSchema = this.getType(fieldType.index());

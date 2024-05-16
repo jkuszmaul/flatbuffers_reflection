@@ -8,7 +8,6 @@
     "url": "git+https://github.com/jkuszmaul/flatbuffers_reflection.git"
   },
   "author": "James Kuszmaul",
-  "license": "Apache-2.0",
   "module": "dist/esm/index.js",
   "main": "dist/cjs/index.js",
   "files": [

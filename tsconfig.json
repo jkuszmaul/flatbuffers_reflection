@@ -1,9 +1,6 @@
 {
   "extends": "@foxglove/tsconfig/base",
-  "include": [
-    "./src/reflection.ts",
-    "./src/reflection_generated.ts",
-    "./src/index.ts"],
+  "include": ["./src/index.ts", "./src/reflection.ts", "./src/vendor/**/*.ts", "./src/gen/**/*.ts"],
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist/esm",

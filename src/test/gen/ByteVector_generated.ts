@@ -2,8 +2,55 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { NestedStruct } from './nested-struct';
 
+export class NestedStruct {
+  bb: flatbuffers.ByteBuffer|null = null;
+  bb_pos = 0;
+  __init(i:number, bb:flatbuffers.ByteBuffer):NestedStruct {
+  this.bb_pos = i;
+  this.bb = bb;
+  return this;
+}
+
+a():number {
+  return this.bb!.readInt32(this.bb_pos);
+}
+
+static sizeOf():number {
+  return 4;
+}
+
+static createNestedStruct(builder:flatbuffers.Builder, a: number):flatbuffers.Offset {
+  builder.prep(4, 4);
+  builder.writeInt32(a);
+  return builder.offset();
+}
+
+
+unpack(): NestedStructT {
+  return new NestedStructT(
+    this.a()
+  );
+}
+
+
+unpackTo(_o: NestedStructT): void {
+  _o.a = this.a();
+}
+}
+
+export class NestedStructT {
+constructor(
+  public a: number = 0
+){}
+
+
+pack(builder:flatbuffers.Builder): flatbuffers.Offset {
+  return NestedStruct.createNestedStruct(builder,
+    this.a
+  );
+}
+}
 
 export class ByteVector {
   bb: flatbuffers.ByteBuffer|null = null;
@@ -80,4 +127,36 @@ static finishSizePrefixedByteVectorBuffer(builder:flatbuffers.Builder, offset:fl
   builder.finish(offset, undefined, true);
 }
 
+
+unpack(): ByteVectorT {
+  return new ByteVectorT(
+    this.bb!.createScalarList(this.data.bind(this), this.dataLength()),
+    (this.nestedStruct() !== null ? this.nestedStruct()!.unpack() : null)
+  );
 }
+
+
+unpackTo(_o: ByteVectorT): void {
+  _o.data = this.bb!.createScalarList(this.data.bind(this), this.dataLength());
+  _o.nestedStruct = (this.nestedStruct() !== null ? this.nestedStruct()!.unpack() : null);
+}
+}
+
+export class ByteVectorT {
+constructor(
+  public data: (number)[] = [],
+  public nestedStruct: NestedStructT|null = null
+){}
+
+
+pack(builder:flatbuffers.Builder): flatbuffers.Offset {
+  const data = ByteVector.createDataVector(builder, this.data);
+
+  ByteVector.startByteVector(builder);
+  ByteVector.addData(builder, data);
+  ByteVector.addNestedStruct(builder, (this.nestedStruct !== null ? this.nestedStruct!.pack(builder) : 0));
+
+  return ByteVector.endByteVector(builder);
+}
+}
+

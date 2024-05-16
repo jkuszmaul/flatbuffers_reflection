@@ -108,7 +108,7 @@ describe("parseReflectionSchema", () => {
 
     const monster = new MonsterT();
     monster.equipped = new ShieldT();
-    monster.equipped.protection = 27.3;
+    monster.equipped.protection = 27.5;
     monster.equippedType = Equipment.Shield;
 
     const builder = new Builder();
@@ -119,7 +119,7 @@ describe("parseReflectionSchema", () => {
     const schemaObject = parser.toObject(table);
 
     console.log(schemaObject);
-    expect(schemaObject).toEqual({ equipped: { protection: 27 } });
+    expect(schemaObject).toEqual({ equipped: { protection: 27.5 } });
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();

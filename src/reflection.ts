@@ -364,11 +364,11 @@ export class Parser {
           readDefaults,
         );
 
-        console.log({ fieldName });
+        // Unions can only be formed from tables so we know our union field will point to a table
+        const rawLambda = this.readTableLambda(typeIndex, fieldName);
 
         lambdas[fieldName] = (table: Table) => {
           const discriminatorValue = scalar(table);
-          console.log(discriminatorValue);
 
           if (typeof discriminatorValue !== "number") {
             throw new Error(`Malformed union discriminator value is not a number`);
@@ -381,7 +381,11 @@ export class Parser {
             );
           }
 
-          return deserializer(table);
+          const subTable = rawLambda(table);
+          if (!subTable) {
+            throw new Error(`Malformed message: missing union field table: '${fieldName}'`);
+          }
+          return deserializer(subTable);
         };
       } else {
         throw new Error(`Arrays are not supported in field '${field.name()}'`);
@@ -564,8 +568,11 @@ export class Parser {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const parentIsStruct = this.getType(typeIndex).isStruct();
-    if (fieldType.baseType() !== reflection.BaseType.Obj) {
-      throw new Error("Field " + fieldName + " is not an object type.");
+    if (
+      fieldType.baseType() !== reflection.BaseType.Obj &&
+      fieldType.baseType() !== reflection.BaseType.Union
+    ) {
+      throw new Error(`Field ${fieldName} is not an object or union type: ${fieldType.baseType()}`);
     }
 
     const elementIsStruct = this.getType(fieldType.index()).isStruct();

@@ -303,10 +303,6 @@ export class Parser {
           throw new Error("Vectors of Unions and Arrays are not supported.");
         }
       } else if (baseType === reflection.BaseType.Union) {
-        // this gets called for the actual field AND the pseudo `_type` field?
-        // no - actually the pseudo _type field is handled elsewhere because it appears as a builtin
-        console.log({ field, fieldName, fieldType });
-
         // For union types, the index points to the enum which has the valid types of the union
         const enumIndex = fieldType.index();
 

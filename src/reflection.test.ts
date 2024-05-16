@@ -2,7 +2,7 @@ import { Builder, ByteBuffer } from "flatbuffers";
 import { Parser, Table } from "./reflection";
 import { BaseType, EnumVal, Field, Schema, Type } from "./reflection_generated";
 import { ByteVector, NestedStruct } from "./test/ByteVector";
-import { Equipment, Monster, MonsterT, ShieldT } from "./test/Union";
+import { Equipment, Monster, Shield } from "./test/Union";
 import { readFileSync } from "fs";
 
 describe("parseReflectionSchema", () => {
@@ -106,19 +106,15 @@ describe("parseReflectionSchema", () => {
     const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
     const schema = Schema.getRootAsSchema(schemaByteBuffer);
 
-    const monster = new MonsterT();
-    monster.equipped = new ShieldT();
-    monster.equipped.protection = 27.5;
-    monster.equippedType = Equipment.Shield;
-
     const builder = new Builder();
-    Monster.finishMonsterBuffer(builder, monster.pack(builder));
+    const shieldOffset = Shield.createShield(builder, 27.5);
+    const offset = Monster.createMonster(builder, Equipment.Shield, shieldOffset);
+    builder.finish(offset);
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
     const schemaObject = parser.toObject(table);
 
-    console.log(schemaObject);
     expect(schemaObject).toEqual({ equipped: { protection: 27.5 } });
 
     // todo vectors of union

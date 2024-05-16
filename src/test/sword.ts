@@ -2,9 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-
-
-export class Sword implements flatbuffers.IUnpackableObject<SwordT> {
+export class Sword {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
   __init(i:number, bb:flatbuffers.ByteBuffer):Sword {
@@ -56,35 +54,5 @@ static createSword(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset, d
   Sword.addName(builder, nameOffset);
   Sword.addDamage(builder, damage);
   return Sword.endSword(builder);
-}
-
-unpack(): SwordT {
-  return new SwordT(
-    this.name(),
-    this.damage()
-  );
-}
-
-
-unpackTo(_o: SwordT): void {
-  _o.name = this.name();
-  _o.damage = this.damage();
-}
-}
-
-export class SwordT implements flatbuffers.IGeneratedObject {
-constructor(
-  public name: string|Uint8Array|null = null,
-  public damage: number = 0
-){}
-
-
-pack(builder:flatbuffers.Builder): flatbuffers.Offset {
-  const name = (this.name !== null ? builder.createString(this.name!) : 0);
-
-  return Sword.createSword(builder,
-    name,
-    this.damage
-  );
 }
 }

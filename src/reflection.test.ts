@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Builder, ByteBuffer } from "flatbuffers";
-import { readFileSync } from "fs";
-
-import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection_generated";
 import { Parser, Table } from "./reflection";
-import { ByteVector, NestedStruct } from "./test/gen/ByteVector_generated";
+import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection";
+import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
+import { readFileSync } from "fs";
 
 describe("parseReflectionSchema", () => {
   it("Reads reflection table", () => {

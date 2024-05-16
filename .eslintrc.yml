@@ -7,7 +7,7 @@ env:
 
 ignorePatterns:
   - dist
-  - src/gen
+  - src/vendor/gen
   - src/test/gen
 
 overrides:

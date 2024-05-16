@@ -2,7 +2,7 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { readFileSync } from "fs";
 
-import { BaseType, EnumVal, Field, Schema, Type } from "./gen/reflection_generated";
+import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection_generated";
 import { Parser, Table } from "./reflection";
 import { ByteVector, NestedStruct } from "./test/gen/ByteVector_generated";
 
@@ -11,7 +11,7 @@ describe("parseReflectionSchema", () => {
     // Set up a test where we use the schema of the Schema type itself to test
     // the reflection library, because in practice the Schema type has ~all of
     // the interesting features that we support reflection for.
-    const reflectionSchemaBuffer: Buffer = readFileSync(`${__dirname}/gen/reflection.bfbs`);
+    const reflectionSchemaBuffer: Buffer = readFileSync(`${__dirname}/vendor/gen/reflection.bfbs`);
     const reflectionSchemaByteBuffer: ByteBuffer = new ByteBuffer(reflectionSchemaBuffer);
     const schema = Schema.getRootAsSchema(reflectionSchemaByteBuffer);
     const parser = new Parser(schema);
@@ -236,7 +236,7 @@ describe("parseReflectionSchema", () => {
   });
 
   it("performs bounds checking for scalars", () => {
-    const reflectionSchemaBuffer = readFileSync(`${__dirname}/gen/reflection.bfbs`);
+    const reflectionSchemaBuffer = readFileSync(`${__dirname}/vendor/gen/reflection.bfbs`);
     const schema = Schema.getRootAsSchema(new ByteBuffer(reflectionSchemaBuffer));
     const parser = new Parser(schema);
 

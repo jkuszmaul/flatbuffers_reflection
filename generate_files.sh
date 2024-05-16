@@ -40,14 +40,16 @@ fi
 "$flatc_executable" --version
 
 echo "Downloading reflection.fbs..."
-curl -sL -o src/reflection.fbs "https://raw.githubusercontent.com/google/flatbuffers/refs/tags/v$flatc_version/reflection/reflection.fbs"
+rm -rf src/vendor
+mkdir -p src/vendor
+curl -sL -o src/vendor/reflection.fbs "https://raw.githubusercontent.com/google/flatbuffers/refs/tags/v$flatc_version/reflection/reflection.fbs"
 
-rm -rf src/gen
-"$flatc_executable" --ts --ts-flat-files --gen-object-api -o src/gen src/*.fbs
-"$flatc_executable" --binary --schema -o src/gen src/*.fbs
+rm -rf src/vendor/gen
+"$flatc_executable" --ts --ts-flat-files --gen-object-api -o src/vendor/gen src/vendor/*.fbs
+"$flatc_executable" --binary --schema -o src/vendor/gen src/vendor/*.fbs
 
 rm -rf src/test/gen
 "$flatc_executable" --ts --ts-flat-files --gen-object-api -o src/test/gen src/test/*.fbs
 "$flatc_executable" --binary --schema -o src/test/gen src/test/*.fbs
 
-rm -r tmp
+rm -rf tmp

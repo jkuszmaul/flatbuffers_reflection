@@ -1,3 +1,18 @@
+
+table Gemstone {
+  shine:double;
+}
+
+table Arms {
+  count:uint8;
+}
+
+table Skull {
+  name:string;
+}
+
+union ShieldDecorator { Gemstone, Arms, Skull }
+
 table Sword {
   name:string;
   damage:short;
@@ -5,6 +20,8 @@ table Sword {
 
 table Shield {
   protection:float;
+  primaryDecorator: ShieldDecorator;
+  decorators:[ShieldDecorator];
 }
 
 union Equipment { Sword, Shield }

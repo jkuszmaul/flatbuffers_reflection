@@ -299,6 +299,110 @@ export class Parser {
             }
             return result;
           };
+        } else if (elementType === reflection.BaseType.Union) {
+          // for a vector of union
+
+          // for a vector of union we also have the sidecar _type_ field
+          // this has the discriminator values for each
+
+          // For union types, the index points to the enum which has the valid types of the union
+          const enumIndex = fieldType.index();
+
+          const unionEnum = this.schema.enums(enumIndex);
+          if (!unionEnum) {
+            throw new Error("Malformed schema: missing enum for union type");
+          }
+
+          const unionDeserializers = new Map<number, (t: Table) => Record<string, any>>();
+
+          for (let eidx = 0; eidx < unionEnum.valuesLength(); ++eidx) {
+            const enumItem = unionEnum.values(eidx);
+            if (!enumItem) {
+              throw new Error("Malformed schema: missing enum item");
+            }
+
+            const specificType = enumItem.unionType();
+            if (!specificType) {
+              throw new Error("Malformed schema: union enum missing unionType");
+            }
+
+            // There is a placeholder for _None_ in the enum so we skip that type
+            const typeIndex = specificType.index();
+            if (typeIndex < 0) {
+              continue;
+            }
+
+            const typeDeserializer = this.toObjectLambda(typeIndex, readDefaults);
+            unionDeserializers.set(Number(enumItem.value()), typeDeserializer);
+          }
+
+          const next = ++ii;
+          if (next >= numFields) {
+            throw new Error(`Missing union discriminator field for field '${field.name()}'`);
+          }
+
+          const unionDiscriminator = schema.fields(next);
+          if (!unionDiscriminator) {
+            throw new Error(`Missing union discriminator field for field '${field.name()}'`);
+          }
+
+          const discriminatorfieldType = unionDiscriminator.type();
+          if (discriminatorfieldType === null) {
+            throw new Error('Malformed schema: "type" field of Field not populated.');
+          }
+
+          if (discriminatorfieldType.baseType() !== reflection.BaseType.Vector) {
+            throw new Error(`Malformed schema: union discriminator field is not an array`);
+          }
+
+          const name = unionDiscriminator.name();
+          if (!name) {
+            throw new Error("changeme");
+          }
+
+          const readDiscriminators = this.readVectorOfScalarsLambda(
+            discriminatorfieldType.index(),
+            name,
+          );
+
+          const vectorLambda = this.readVectorOfTablesLambda(typeIndex, fieldName);
+
+          lambdas[fieldName] = (table: Table) => {
+            const res = readDiscriminators(table);
+
+            if (!res) {
+              throw new Error("changeme");
+            }
+
+            const vector = vectorLambda(table);
+            if (vector === null) {
+              throw new Error("missing vector table");
+            }
+
+            if (res.length !== vector.length) {
+              throw new Error("malformed - missmatch in vector lengths");
+            }
+
+            const result = [];
+            for (let idx = 0; idx < vector.length; ++idx) {
+              const discriminator = res[idx];
+              if (typeof discriminator !== "number") {
+                throw new Error(`Malformed union discriminator value is not a number`);
+              }
+              const deserializer = unionDeserializers.get(discriminator);
+              if (!deserializer) {
+                throw new Error(`Malformed message: could not find union type: '${discriminator}'`);
+              }
+
+              const subTable = vector[idx];
+              if (!subTable) {
+                throw new Error("changeme");
+              }
+              result.push(deserializer(subTable));
+            }
+
+            return result;
+          };
         } else {
           throw new Error("Vectors of Unions and Arrays are not supported.");
         }
@@ -656,8 +760,11 @@ export class Parser {
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
       throw new Error("Field " + fieldName + " is not an vector.");
     }
-    if (fieldType.element() !== reflection.BaseType.Obj) {
-      throw new Error("Field " + fieldName + " is not an vector of objects.");
+    if (
+      fieldType.element() !== reflection.BaseType.Obj &&
+      fieldType.element() !== reflection.BaseType.Union
+    ) {
+      throw new Error("Field " + fieldName + " is not an vector of objects or union.");
     }
 
     const elementSchema = this.getType(fieldType.index());

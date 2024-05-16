@@ -2,7 +2,7 @@ import { Builder, ByteBuffer } from "flatbuffers";
 import { Parser, Table } from "./reflection";
 import { BaseType, EnumVal, Field, Schema, Type } from "./reflection_generated";
 import { ByteVector, NestedStruct } from "./test/ByteVector";
-import { Equipment, Monster, Shield } from "./test/Union";
+import { Equipment, Gemstone, Monster, Shield, ShieldDecorator, Skull, Arms } from "./test/Union";
 import { readFileSync } from "fs";
 
 describe("parseReflectionSchema", () => {
@@ -107,7 +107,25 @@ describe("parseReflectionSchema", () => {
     const schema = Schema.getRootAsSchema(schemaByteBuffer);
 
     const builder = new Builder();
-    const shieldOffset = Shield.createShield(builder, 27.5);
+
+    const gemstoneOffset = Gemstone.createGemstone(builder, 1.02337);
+    const skullOffset = Skull.createSkull(builder, builder.createString("some-name"));
+    const typeVectorOffset = Shield.createDecoratorsTypeVector(builder, [
+      ShieldDecorator.Gemstone,
+      ShieldDecorator.Skull,
+    ]);
+    const decoratorsOffset = Shield.createDecoratorsVector(builder, [gemstoneOffset, skullOffset]);
+
+    const primaryDecoratorOffset = Arms.createArms(builder, 12);
+
+    const shieldOffset = Shield.createShield(
+      builder,
+      27.5,
+      ShieldDecorator.Arms,
+      primaryDecoratorOffset,
+      typeVectorOffset,
+      decoratorsOffset,
+    );
     const offset = Monster.createMonster(builder, Equipment.Shield, shieldOffset);
     builder.finish(offset);
 
@@ -115,10 +133,15 @@ describe("parseReflectionSchema", () => {
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
     const schemaObject = parser.toObject(table);
 
-    expect(schemaObject).toEqual({ equipped: { protection: 27.5 } });
+    expect(schemaObject).toEqual({
+      equipped: {
+        protection: 27.5,
+        primaryDecorator: { count: 12 },
+        decorators: [{ shine: 1.02337 }, { name: "some-name" }],
+      },
+    });
 
     // todo vectors of union
-    // union aliases
     // union with table that also uses union
   });
   it("converts uint8 vectors to uint8arrays", () => {

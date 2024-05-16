@@ -1,9 +1,0 @@
-sh_binary(
-    name = "generate_files",
-    srcs = ["generate_files.sh"],
-    data = [
-        "//src:ByteVector.fbs",
-        "@com_github_google_flatbuffers//:flatc",
-    ],
-    deps = ["@bazel_tools//tools/bash/runfiles"],
-)

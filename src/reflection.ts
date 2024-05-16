@@ -12,15 +12,11 @@
 // Currently, this only really supports the level of reflection that would
 // be necessary to convert a serialized flatbuffer to JSON using just a
 // reflection.Schema flatbuffer describing the type.
-// Note that this currently assumes that reflection.fbs is codegen'd to
-// typescript using --ts-flat-file and made available at
-// 'flatbuffers_refleciton/reflection_generated'. If you are using the
-// provided bazel rules, this is managed for you.
-// See tests/reflection_test.ts for sample usage.
+// See tests/reflection.test.ts for sample usage.
 
 import { ByteBuffer } from "flatbuffers";
 
-import * as reflection from "./reflection_generated";
+import * as reflection from "./gen/reflection_generated";
 
 // Returns the size, in bytes, of the given type. For vectors/strings/etc.
 // returns the size of the offset.

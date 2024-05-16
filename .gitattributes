@@ -1,0 +1,3 @@
+src/gen/** linguist-generated=true
+src/test/gen/** linguist-generated=true
+src/reflection.fbs linguist-vendored=true

@@ -10,28 +10,29 @@ on:
 jobs:
   all:
     name: all
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v3.5.2
 
       - uses: actions/setup-node@v3.6.0
         with:
-          node-version: 16
+          node-version: 20
           registry-url: https://registry.npmjs.org
           cache: yarn
 
-      - uses: bazelbuild/setup-bazelisk@v2
-      - name: Mount bazel cache  # Optional
-        uses: actions/cache@v3
-        with:
-          path: "~/.cache/bazel"
-          key: bazel
+      - run: DOWNLOAD_FLATC=linux ./generate_files.sh
 
-      # Functionally a linting step.
-      # Note: This may be overly brittle depending on how stable the flatc
-      # compiler is.
-      - run: bazel run //:generate_files
+      - name: Ensure generated files are up to date
+        run: |
+          changes=$(git status --porcelain)
+          if [ -n "$changes" ]; then
+            echo "::error::The following generated files need to be updated. Run generate_files.sh to update them."
+            echo "$changes"
+            exit 1
+          else
+            echo "Generated files are up to date!"
+          fi
 
       - run: yarn install --frozen-lockfile
 
@@ -39,4 +40,3 @@ jobs:
       #TODO(jkuszmaul): Reenable linting.
       #- run: yarn run lint
       - run: yarn run test
-

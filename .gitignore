@@ -3,6 +3,6 @@
 *.tsbuildinfo
 dist/
 node_modules/
-bazel-*
 .aspect/
 .yarn/
+tmp

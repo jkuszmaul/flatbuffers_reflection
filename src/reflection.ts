@@ -298,8 +298,6 @@ export class Parser {
         } else {
           throw new Error("Vectors of Unions and Arrays are not supported.");
         }
-      } else if (baseType === reflection.BaseType.Union) {
-        throw new Error("Unions are not supported in field " + field.name());
       } else if (baseType === reflection.BaseType.Array) {
         if (!schema.isStruct()) {
           throw new Error("Arrays are only supported inside structs, not tables");
@@ -312,6 +310,8 @@ export class Parser {
         } else {
           throw new Error("Arrays may contain only scalar or struct fields");
         }
+      } else {
+        throw new Error("Unions are not supported in field " + field.name());
       }
     }
     return (t: Table) => {

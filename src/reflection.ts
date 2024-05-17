@@ -304,44 +304,11 @@ export class Parser {
         if (!schema.isStruct()) {
           throw new Error("Arrays are only supported inside structs, not tables");
         }
-        const arrayLength = fieldType.fixedLength();
         const elementType = fieldType.element();
-        const fieldTypeIndex = fieldType.index();
-        const fieldOffset = field.offset();
         if (isScalar(elementType)) {
-          const elementSize = typeSize(elementType);
-          lambdas[fieldName] = (t: Table) => {
-            if (!t.isStruct) {
-              throw new Error("Arrays are only supported inside structs, not tables");
-            }
-            const result = new Array<unknown>(arrayLength);
-            let offset = t.offset + fieldOffset;
-            for (let i = 0; i < arrayLength; i++) {
-              result[i] = t.readScalar(elementType, offset);
-              offset += elementSize;
-            }
-            return result;
-          };
+          lambdas[fieldName] = this.readArrayOfScalarsLambda(field);
         } else if (elementType === reflection.BaseType.Obj) {
-          const elementSchema = this.getType(fieldTypeIndex);
-          if (!elementSchema.isStruct()) {
-            throw new Error("Arrays may only contain structs, not tables");
-          }
-          const elementSize = elementSchema.bytesize();
-          const subTableLambda = this.toObjectLambda(fieldTypeIndex, readDefaults);
-          lambdas[fieldName] = (t: Table) => {
-            if (!t.isStruct) {
-              throw new Error("Arrays are only supported inside structs, not tables");
-            }
-            const result = new Array<unknown>(arrayLength);
-            let offset = t.offset + fieldOffset;
-            for (let i = 0; i < arrayLength; i++) {
-              const subTable = new Table(t.bb, fieldTypeIndex, offset, true);
-              result[i] = subTableLambda(subTable);
-              offset += elementSize;
-            }
-            return result;
-          };
+          lambdas[fieldName] = this.readArrayOfStructsLambda(field, readDefaults);
         } else {
           throw new Error("Arrays may contain only scalar or struct fields");
         }
@@ -658,6 +625,63 @@ export class Parser {
       const offsetSize = typeSize(fieldType.element());
       for (let ii = 0; ii < numElements; ++ii) {
         result.push(table.bb.__string(baseOffset + offsetSize * ii) as string);
+      }
+      return result;
+    };
+  }
+
+  readArrayOfScalarsLambda(
+    field: reflection.Field,
+  ): (t: Table) => Array<number | bigint | boolean> {
+    const fieldType = field.type();
+    if (fieldType === null) {
+      throw new Error('Malformed schema: "type" field of Field not populated.');
+    }
+    const arrayLength = fieldType.fixedLength();
+    const elementType = fieldType.element();
+    const fieldOffset = field.offset();
+    const elementSize = typeSize(elementType);
+    return (t: Table) => {
+      if (!t.isStruct) {
+        throw new Error("Arrays are only supported inside structs, not tables");
+      }
+      const result = new Array<number | bigint | boolean>(arrayLength);
+      let offset = t.offset + fieldOffset;
+      for (let i = 0; i < arrayLength; i++) {
+        result[i] = t.readScalar(elementType, offset);
+        offset += elementSize;
+      }
+      return result;
+    };
+  }
+
+  readArrayOfStructsLambda(
+    field: reflection.Field,
+    readDefaults: boolean,
+  ): (t: Table) => Array<Record<string, any>> {
+    const fieldType = field.type();
+    if (fieldType === null) {
+      throw new Error('Malformed schema: "type" field of Field not populated.');
+    }
+    const arrayLength = fieldType.fixedLength();
+    const fieldOffset = field.offset();
+    const fieldTypeIndex = fieldType.index();
+    const elementSchema = this.getType(fieldTypeIndex);
+    if (!elementSchema.isStruct()) {
+      throw new Error("Arrays may only contain structs, not tables");
+    }
+    const elementSize = elementSchema.bytesize();
+    const subTableLambda = this.toObjectLambda(fieldTypeIndex, readDefaults);
+    return (t: Table) => {
+      if (!t.isStruct) {
+        throw new Error("Arrays are only supported inside structs, not tables");
+      }
+      const result = new Array<Record<string, any>>(arrayLength);
+      let offset = t.offset + fieldOffset;
+      for (let i = 0; i < arrayLength; i++) {
+        const subTable = new Table(t.bb, fieldTypeIndex, offset, true);
+        result[i] = subTableLambda(subTable);
+        offset += elementSize;
       }
       return result;
     };

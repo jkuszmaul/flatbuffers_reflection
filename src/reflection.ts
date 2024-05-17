@@ -314,7 +314,7 @@ export class Parser {
             if (!t.isStruct) {
               throw new Error("Arrays are only supported inside structs, not tables");
             }
-            let result = new Array(arrayLength);
+            const result = new Array<unknown>(arrayLength);
             let offset = t.offset + fieldOffset;
             for (let i = 0; i < arrayLength; i++) {
               result[i] = t.readScalar(elementType, offset);
@@ -333,7 +333,7 @@ export class Parser {
             if (!t.isStruct) {
               throw new Error("Arrays are only supported inside structs, not tables");
             }
-            let result = new Array(arrayLength);
+            const result = new Array<unknown>(arrayLength);
             let offset = t.offset + fieldOffset;
             for (let i = 0; i < arrayLength; i++) {
               const subTable = new Table(t.bb, fieldTypeIndex, offset, true);

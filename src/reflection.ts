@@ -253,7 +253,7 @@ export class Parser {
     for (let i = 0; i < numFields; ++i) {
       const field = schema.fields(i);
       if (field === null) {
-        throw new Error("Malformed schema: field at index " + i + " not populated.");
+        throw new Error(`Malformed schema: field at index ${i} not populated.`);
       }
       sortedFields.push(field);
     }

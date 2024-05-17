@@ -3,14 +3,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 export { ArraysTable, ArraysTableT } from './arrays-table';
+export { Color } from './color';
 export { Mat3x3b, Mat3x3bT } from './mat3x3b';
 export { Mat3x3d, Mat3x3dT } from './mat3x3d';
+export { Mat3x3e, Mat3x3eT } from './mat3x3e';
 export { Mat3x3f, Mat3x3fT } from './mat3x3f';
 export { Mat3x3i, Mat3x3iT } from './mat3x3i';
 export { Mat3x3l, Mat3x3lT } from './mat3x3l';
 export { Mat3x3s, Mat3x3sT } from './mat3x3s';
 export { Point3b, Point3bT } from './point3b';
 export { Point3d, Point3dT } from './point3d';
+export { Point3e, Point3eT } from './point3e';
 export { Point3f, Point3fT } from './point3f';
 export { Point3i, Point3iT } from './point3i';
 export { Point3l, Point3lT } from './point3l';

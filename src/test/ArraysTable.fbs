@@ -1,3 +1,5 @@
+enum Color : byte { Red = 0, Green, Blue }
+
 struct Point3b {
   xyz:[byte:3];
 }
@@ -16,6 +18,9 @@ struct Point3f {
 }
 struct Point3d {
   xyz:[double:3];
+}
+struct Point3e {
+  xyz:[Color:3];
 }
 
 struct Mat3x3b {
@@ -37,6 +42,9 @@ struct Mat3x3f {
 struct Mat3x3d {
   cols:[Point3d:3];
 }
+struct Mat3x3e {
+  cols:[Point3e:3];
+}
 
 table ArraysTable {
   point3b_vec:[Point3b];
@@ -46,6 +54,7 @@ table ArraysTable {
   point3l_vec:[Point3l];
   point3f_vec:[Point3f];
   point3d_vec:[Point3d];
+  point3e_vec:[Point3e];
   mat3x3b:Mat3x3b;
   mat3x3s:Mat3x3s;
   pad2:ubyte; // forces additional padding for alignment
@@ -53,5 +62,6 @@ table ArraysTable {
   mat3x3l:Mat3x3l;
   mat3x3f:Mat3x3f;
   mat3x3d:Mat3x3d;
+  mat3x3e:Mat3x3e;
 }
 root_type ArraysTable;

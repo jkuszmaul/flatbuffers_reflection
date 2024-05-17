@@ -5,14 +5,17 @@ import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
 import {
   ArraysTable,
   ArraysTableT,
+  Color,
   Mat3x3bT,
   Mat3x3dT,
+  Mat3x3eT,
   Mat3x3fT,
   Mat3x3iT,
   Mat3x3lT,
   Mat3x3sT,
   Point3bT,
   Point3dT,
+  Point3eT,
   Point3fT,
   Point3iT,
   Point3lT,
@@ -291,6 +294,7 @@ describe("parseReflectionSchema", () => {
       [new Point3lT(0, [1_000_000n, 1_000_001n, 1_000_002n])],
       [new Point3fT([1.5, 2.5, 3.5])],
       [new Point3dT([1.1, 2.1, 3.1])],
+      [new Point3eT([Color.Red, Color.Green, Color.Blue])],
       new Mat3x3bT([
         new Point3bT([10, 11, 12]),
         new Point3bT([13, 14, 15]),
@@ -322,12 +326,16 @@ describe("parseReflectionSchema", () => {
         new Point3dT([4.1, 5.1, 6.1]),
         new Point3dT([7.1, 8.1, 9.1]),
       ]),
+      new Mat3x3eT([
+        new Point3eT([Color.Red, Color.Green, Color.Blue]),
+        new Point3eT([Color.Green, Color.Red, Color.Blue]),
+        new Point3eT([Color.Green, Color.Blue, Color.Red]),
+      ]),
     );
 
     const builder = new Builder();
     ArraysTable.finishArraysTableBuffer(builder, arraysTable.pack(builder));
     const fbBuffer = new ByteBuffer(builder.asUint8Array());
-    console.log(Buffer.from(fbBuffer.bytes()).toString("hex"));
 
     const table = Table.getRootTable(fbBuffer);
     expect(parser.toObject(table)).toEqual({
@@ -338,6 +346,7 @@ describe("parseReflectionSchema", () => {
       point3l_vec: arraysTable.point3lVec.map((p) => ({ ...p })),
       point3f_vec: arraysTable.point3fVec.map((p) => ({ ...p })),
       point3d_vec: arraysTable.point3dVec.map((p) => ({ ...p })),
+      point3e_vec: arraysTable.point3eVec.map((p) => ({ ...p })),
       mat3x3b: { cols: arraysTable.mat3x3b?.cols.map((p) => ({ ...p })) },
       mat3x3s: { cols: arraysTable.mat3x3s?.cols.map((p) => ({ ...p })) },
       pad2: 1,
@@ -345,6 +354,7 @@ describe("parseReflectionSchema", () => {
       mat3x3l: { pad1: 1, cols: arraysTable.mat3x3l?.cols.map((p) => ({ ...p })) },
       mat3x3f: { cols: arraysTable.mat3x3f?.cols.map((p) => ({ ...p })) },
       mat3x3d: { cols: arraysTable.mat3x3d?.cols.map((p) => ({ ...p })) },
+      mat3x3e: { cols: arraysTable.mat3x3e?.cols.map((p) => ({ ...p })) },
     });
   });
 });

@@ -100,6 +100,23 @@ describe("parseReflectionSchema", () => {
       expect(parser.readScalar(fieldTable, "padding", true)).toBe(0);
     }
   });
+  it("reads fields in order of id", () => {
+    const reflectionSchemaBuffer: Buffer = readFileSync(`${__dirname}/vendor/gen/reflection.bfbs`);
+    const reflectionSchemaByteBuffer: ByteBuffer = new ByteBuffer(reflectionSchemaBuffer);
+    const schema = Schema.getRootAsSchema(reflectionSchemaByteBuffer);
+    const parser = new Parser(schema);
+    const table = Table.getRootTable(reflectionSchemaByteBuffer);
+    const schemaObject = parser.toObject(table);
+    expect(Object.keys(schemaObject)).toEqual([
+      "objects",
+      "enums",
+      "file_ident",
+      "file_ext",
+      "root_table",
+      "services",
+      "fbs_files",
+    ]);
+  });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();
     const data = ByteVector.createDataVector(builder, [1, 2, 3]);

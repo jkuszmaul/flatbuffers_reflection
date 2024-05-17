@@ -247,11 +247,19 @@ export class Parser {
     const lambdas: Record<string, any> = {};
     const schema = this.getType(typeIndex);
     const numFields = schema.fieldsLength();
-    for (let ii = 0; ii < numFields; ++ii) {
-      const field = schema.fields(ii);
+
+    // Sort fields by ID so the resulting object is built with fields in this order
+    const sortedFields: reflection.Field[] = [];
+    for (let i = 0; i < numFields; ++i) {
+      const field = schema.fields(i);
       if (field === null) {
-        throw new Error("Malformed schema: field at index " + ii + " not populated.");
+        throw new Error("Malformed schema: field at index " + i + " not populated.");
       }
+      sortedFields.push(field);
+    }
+    sortedFields.sort((a, b) => a.id() - b.id());
+
+    for (const field of sortedFields) {
       const fieldType = field.type();
       if (fieldType === null) {
         throw new Error('Malformed schema: "type" field of Field not populated.');

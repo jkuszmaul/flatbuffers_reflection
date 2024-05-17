@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-flatc_version="2.0.8"
+flatc_version="24.3.25"
 expected_flatc_version_output="flatc version $flatc_version"
 
 # Detect whether an installed flatc is usable or download it if requested.
@@ -20,7 +20,7 @@ else
       exit 1
       ;;
     linux)
-      flatc_artifact_name=Linux.flatc.binary.clang++-12.zip
+      flatc_artifact_name=Linux.flatc.binary.clang++-15.zip
       ;;
     mac)
       flatc_artifact_name=Mac.flatc.binary.zip
@@ -45,11 +45,11 @@ mkdir -p src/vendor
 curl -sL -o src/vendor/reflection.fbs "https://raw.githubusercontent.com/google/flatbuffers/refs/tags/v$flatc_version/reflection/reflection.fbs"
 
 rm -rf src/vendor/gen
-"$flatc_executable" --ts --ts-flat-files --gen-object-api -o src/vendor/gen src/vendor/*.fbs
+"$flatc_executable" --ts --ts-no-import-ext --gen-object-api -o src/vendor/gen src/vendor/*.fbs
 "$flatc_executable" --binary --schema -o src/vendor/gen src/vendor/*.fbs
 
 rm -rf src/test/gen
-"$flatc_executable" --ts --ts-flat-files --gen-object-api -o src/test/gen src/test/*.fbs
+"$flatc_executable" --ts --ts-no-import-ext --gen-object-api -o src/test/gen src/test/*.fbs
 "$flatc_executable" --binary --schema -o src/test/gen src/test/*.fbs
 
 rm -rf tmp

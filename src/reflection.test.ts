@@ -1,7 +1,7 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Parser, Table } from "./reflection";
-import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection_generated";
-import { ByteVector, NestedStruct } from "./test/gen/ByteVector_generated";
+import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection";
+import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
 import { readFileSync } from "fs";
 
 describe("parseReflectionSchema", () => {

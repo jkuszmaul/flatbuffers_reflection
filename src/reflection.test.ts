@@ -23,6 +23,13 @@ import {
   Point3sT,
 } from "./test/gen/ArraysTable";
 import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
+import { ArmsT } from "./test/gen/arms";
+import { Equipment } from "./test/gen/equipment";
+import { GemstoneT } from "./test/gen/gemstone";
+import { Monster, MonsterT } from "./test/gen/monster";
+import { ShieldT } from "./test/gen/shield";
+import { ShieldDecorator } from "./test/gen/shield-decorator";
+import { SkullT } from "./test/gen/skull";
 import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection";
 
 describe("parseReflectionSchema", () => {
@@ -139,6 +146,71 @@ describe("parseReflectionSchema", () => {
       "services",
       "fbs_files",
     ]);
+  });
+  it("supports union types", () => {
+    const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/Union.bfbs`);
+    const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
+    const schema = Schema.getRootAsSchema(schemaByteBuffer);
+
+    const monster = new MonsterT();
+
+    monster.equippedType = Equipment.Shield;
+    monster.equipped = new ShieldT();
+    monster.equipped.protection = 27.5;
+    monster.equipped.primaryDecorator = new ArmsT(12);
+    monster.equipped.primaryDecoratorType = ShieldDecorator.Arms;
+
+    monster.equipped.decorators.push(new GemstoneT(1.02337));
+    monster.equipped.decorators.push(new SkullT("some-name"));
+    monster.equipped.decoratorsType.push(ShieldDecorator.Gemstone);
+    monster.equipped.decoratorsType.push(ShieldDecorator.Skull);
+
+    const builder = new Builder();
+    Monster.finishMonsterBuffer(builder, monster.pack(builder));
+
+    const parser = new Parser(schema);
+    const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
+    const schemaObject = parser.toObject(table);
+
+    expect(schemaObject).toEqual({
+      equipped_type: Equipment.Shield,
+      equipped: {
+        protection: 27.5,
+        primary_decorator: { count: 12 },
+        primary_decorator_type: ShieldDecorator.Arms,
+        decorators: [{ shine: 1.02337 }, { name: "some-name" }],
+        decorators_type: [ShieldDecorator.Gemstone, ShieldDecorator.Skull],
+      },
+    });
+  });
+  it("supports union NONE", () => {
+    const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/Union.bfbs`);
+    const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
+    const schema = Schema.getRootAsSchema(schemaByteBuffer);
+
+    const monster = new MonsterT();
+
+    monster.equippedType = Equipment.Shield;
+    monster.equipped = new ShieldT();
+    monster.equipped.protection = -27.5;
+    monster.equipped.primaryDecoratorType = ShieldDecorator.NONE;
+
+    const builder = new Builder();
+    Monster.finishMonsterBuffer(builder, monster.pack(builder));
+
+    const parser = new Parser(schema);
+    const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
+    const schemaObject = parser.toObject(table);
+
+    expect(schemaObject).toEqual({
+      equipped_type: Equipment.Shield,
+      equipped: {
+        protection: -27.5,
+        primary_decorator: undefined,
+        decorators: [],
+        decorators_type: [],
+      },
+    });
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();

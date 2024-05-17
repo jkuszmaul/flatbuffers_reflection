@@ -16,16 +16,20 @@ export class Mat3x3l implements flatbuffers.IUnpackableObject<Mat3x3lT> {
   return this;
 }
 
+pad1():number {
+  return this.bb!.readUint8(this.bb_pos);
+}
+
 cols(index: number, obj?:Point3l):Point3l|null {
-    return (obj || new Point3l()).__init(this.bb_pos + 0 + index * 24, this.bb!);
+    return (obj || new Point3l()).__init(this.bb_pos + 8 + index * 32, this.bb!);
 }
 
 static sizeOf():number {
-  return 72;
+  return 104;
 }
 
-static createMat3x3l(builder:flatbuffers.Builder, cols: (any|Point3lT)[]|null):flatbuffers.Offset {
-  builder.prep(8, 72);
+static createMat3x3l(builder:flatbuffers.Builder, pad1: number, cols: (any|Point3lT)[]|null):flatbuffers.Offset {
+  builder.prep(8, 104);
 
   for (let i = 2; i >= 0; --i) {
     const item = cols?.[i];
@@ -36,34 +40,41 @@ static createMat3x3l(builder:flatbuffers.Builder, cols: (any|Point3lT)[]|null):f
     }
 
     Point3l.createPoint3l(builder,
+    item?.pad1,
     item?.xyz
     );
   }
 
+  builder.pad(7);
+  builder.writeInt8(pad1);
   return builder.offset();
 }
 
 
 unpack(): Mat3x3lT {
   return new Mat3x3lT(
+    this.pad1(),
     this.bb!.createObjList<Point3l, Point3lT>(this.cols.bind(this), 3)
   );
 }
 
 
 unpackTo(_o: Mat3x3lT): void {
+  _o.pad1 = this.pad1();
   _o.cols = this.bb!.createObjList<Point3l, Point3lT>(this.cols.bind(this), 3);
 }
 }
 
 export class Mat3x3lT implements flatbuffers.IGeneratedObject {
 constructor(
+  public pad1: number = 0,
   public cols: (Point3lT)[] = []
 ){}
 
 
 pack(builder:flatbuffers.Builder): flatbuffers.Offset {
   return Mat3x3l.createMat3x3l(builder,
+    this.pad1,
     this.cols
   );
 }

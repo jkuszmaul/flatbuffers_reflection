@@ -306,6 +306,8 @@ export class Parser {
         }
         const arrayLength = fieldType.fixedLength();
         const elementType = fieldType.element();
+        const fieldTypeIndex = fieldType.index();
+        const fieldOffset = field.offset();
         if (isScalar(elementType)) {
           const elementSize = typeSize(elementType);
           lambdas[fieldName] = (t: Table) => {
@@ -313,7 +315,7 @@ export class Parser {
               throw new Error("Arrays are only supported inside structs, not tables");
             }
             let result = new Array(arrayLength);
-            let offset = t.offset + field.offset();
+            let offset = t.offset + fieldOffset;
             for (let i = 0; i < arrayLength; i++) {
               result[i] = t.readScalar(elementType, offset);
               offset += elementSize;
@@ -321,20 +323,20 @@ export class Parser {
             return result;
           };
         } else if (elementType === reflection.BaseType.Obj) {
-          const elementSchema = this.getType(fieldType.index());
+          const elementSchema = this.getType(fieldTypeIndex);
           if (!elementSchema.isStruct()) {
             throw new Error("Arrays may only contain structs, not tables");
           }
           const elementSize = elementSchema.bytesize();
-          const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
+          const subTableLambda = this.toObjectLambda(fieldTypeIndex, readDefaults);
           lambdas[fieldName] = (t: Table) => {
             if (!t.isStruct) {
               throw new Error("Arrays are only supported inside structs, not tables");
             }
             let result = new Array(arrayLength);
-            let offset = t.offset + field.offset();
+            let offset = t.offset + fieldOffset;
             for (let i = 0; i < arrayLength; i++) {
-              const subTable = new Table(t.bb, fieldType.index(), offset, true);
+              const subTable = new Table(t.bb, fieldTypeIndex, offset, true);
               result[i] = subTableLambda(subTable);
               offset += elementSize;
             }

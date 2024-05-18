@@ -248,7 +248,8 @@ export class Parser {
     const schema = this.getType(typeIndex);
     const numFields = schema.fieldsLength();
 
-    // Sort fields by ID so the resulting object is built with fields in this order
+    // Sort fields by ID so the resulting object is built with fields in this order.
+    // This tends to correspond with the order in the original .fbs (unless ids were specified manually).
     const sortedFields: reflection.Field[] = [];
     for (let i = 0; i < numFields; ++i) {
       const field = schema.fields(i);

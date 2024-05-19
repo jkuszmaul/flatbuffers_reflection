@@ -54,7 +54,7 @@ jobs:
       - name: Publish to NPM
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          PACKAGE_VERSION="refs/tags/v$(cat package.json | jq .version)"
+          PACKAGE_VERSION="refs/tags/v$(cat package.json | jq .version -r)"
           if [ ${{ github.ref }} != "${PACKAGE_VERSION}" ]; then
              echo "::error::The package.json version does not match the git tag used for this release."
              echo "${PACKAGE_VERSION}"

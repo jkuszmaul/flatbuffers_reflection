@@ -9,7 +9,7 @@
   "editor.insertSpaces": true,
   "editor.tabSize": 2,
   "eslint.options": {
-    "reportUnusedDisableDirectives": true
+    "reportUnusedDisableDirectives": "error"
   },
   "files.eol": "\n",
   "files.insertFinalNewline": true,

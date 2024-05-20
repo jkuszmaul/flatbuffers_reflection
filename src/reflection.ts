@@ -172,7 +172,7 @@ export class Table {
         return new Table(
           bb,
           ii,
-          offset === undefined ? bb.readUint32(bb.position()) + bb.position() : offset,
+          offset ?? bb.readUint32(bb.position()) + bb.position(),
           schemaObject.isStruct(),
         );
       }
@@ -244,7 +244,7 @@ export class Parser {
   constructor(private readonly schema: reflection.Schema) {}
 
   toObjectLambda(typeIndex: number, readDefaults = false): (t: Table) => Record<string, any> {
-    const lambdas: Record<string, any> = {};
+    const lambdas: Record<string, (t: Table) => any> = {};
     const schema = this.getType(typeIndex);
     const numFields = schema.fieldsLength();
 
@@ -328,8 +328,10 @@ export class Parser {
       // Go through and attempt to use every single field accessor; return the
       // resulting object.
       for (const field in lambdas) {
-        const value = lambdas[field](t);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const value = lambdas[field]?.(t);
         if (value !== null) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           obj[field] = value;
         }
       }

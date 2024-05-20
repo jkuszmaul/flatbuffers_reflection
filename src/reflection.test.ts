@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Builder, ByteBuffer } from "flatbuffers";
+import { readFileSync } from "fs";
+
 import { Parser, Table } from "./reflection";
-import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection";
-import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
 import {
   ArraysTable,
   ArraysTableT,
@@ -21,7 +22,8 @@ import {
   Point3lT,
   Point3sT,
 } from "./test/gen/ArraysTable";
-import { readFileSync } from "fs";
+import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
+import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection";
 
 describe("parseReflectionSchema", () => {
   it("Reads reflection table", () => {
@@ -33,14 +35,16 @@ describe("parseReflectionSchema", () => {
     const schema = Schema.getRootAsSchema(reflectionSchemaByteBuffer);
     const parser = new Parser(schema);
     const table = Table.getRootTable(reflectionSchemaByteBuffer);
-    const schemaObject = parser.toObject(table);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+    const schemaObject = parser.toObject(table) as any;
     // Spot-check some individual features of the reflection schema. This
     // covers testing that we can read vectors of tables.
     expect(schemaObject["objects"].length).toEqual(schema.objectsLength());
     expect(schemaObject["objects"].length).toEqual(10);
-    expect(schemaObject["objects"][0]["name"]).toEqual("reflection.Enum");
+    expect(schemaObject["objects"][0]!["name"]).toEqual("reflection.Enum");
     expect(schemaObject["file_ident"]).toEqual("BFBS");
     expect(schemaObject["file_ext"]).toEqual("bfbs");
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     expect(schemaObject["fbs_files"][0]["filename"].substr(-14)).toEqual("reflection.fbs");
     expect(schemaObject["fbs_files"][0]["included_filenames"].length).toEqual(0);
 
@@ -85,7 +89,7 @@ describe("parseReflectionSchema", () => {
         BigInt(Number.MAX_SAFE_INTEGER) + 2n,
       );
       const typeFb = parser.readTable(enumTable, "union_type");
-      if (typeFb === null) {
+      if (typeFb == null) {
         throw new Error();
       }
       expect(parser.readScalar(typeFb, "index", false)).toBe(123);

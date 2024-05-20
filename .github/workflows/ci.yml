@@ -12,6 +12,10 @@ jobs:
     name: all
     runs-on: ubuntu-24.04
 
+    permissions:
+      # https://docs.npmjs.com/generating-provenance-statements#publishing-packages-with-provenance-via-github-actions
+      id-token: write
+
     steps:
       - uses: actions/checkout@v3.5.2
 
@@ -39,3 +43,24 @@ jobs:
       - run: yarn run build
       - run: yarn run lint
       - run: yarn run test
+
+      - run: yarn pack
+      - name: Publish to NPM (dry run)
+        # `yarn publish` does not support --provenance
+        run: npm publish flatbuffers_reflection-*.tgz --provenance --access public --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+      - name: Publish to NPM
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          PACKAGE_VERSION="refs/tags/v$(cat package.json | jq .version -r)"
+          if [ ${{ github.ref }} != "${PACKAGE_VERSION}" ]; then
+             echo "::error::The package.json version does not match the git tag used for this release."
+             echo "${PACKAGE_VERSION}"
+             echo ${{ github.ref }}
+             exit 1
+          fi
+          # `yarn publish` does not support --provenance
+          npm publish flatbuffers_reflection-*.tgz --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}

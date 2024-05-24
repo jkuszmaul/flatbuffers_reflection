@@ -195,6 +195,9 @@ describe("parseReflectionSchema", () => {
     monster.equipped.protection = -27.5;
     monster.equipped.primaryDecoratorType = ShieldDecorator.NONE;
 
+    monster.equipped.decorators.push(new GemstoneT(1.02337));
+    monster.equipped.decoratorsType.push(ShieldDecorator.NONE);
+
     const builder = new Builder();
     Monster.finishMonsterBuffer(builder, monster.pack(builder));
 
@@ -207,8 +210,8 @@ describe("parseReflectionSchema", () => {
       equipped: {
         protection: -27.5,
         primary_decorator: undefined,
-        decorators: [],
-        decorators_type: [],
+        decorators: [{}],
+        decorators_type: [ShieldDecorator.NONE],
       },
     });
   });

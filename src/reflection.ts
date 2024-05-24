@@ -781,8 +781,9 @@ export class Parser {
           );
         }
 
-        // Skip NONE
-        if (discriminator < 0) {
+        // NONE becomes an empty object since we need to return an array of Record
+        if (discriminator <= 0) {
+          result.push({});
           continue;
         }
 
@@ -845,7 +846,7 @@ export class Parser {
       }
 
       // Skip NONE
-      if (discriminatorValue < 0) {
+      if (discriminatorValue <= 0) {
         return undefined;
       }
 

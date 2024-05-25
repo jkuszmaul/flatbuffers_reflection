@@ -210,7 +210,7 @@ describe("parseReflectionSchema", () => {
       equipped: {
         protection: -27.5,
         primary_decorator: undefined,
-        decorators: [{}],
+        decorators: [undefined],
         decorators_type: [ShieldDecorator.NONE],
       },
     });

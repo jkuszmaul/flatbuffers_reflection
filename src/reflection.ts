@@ -733,7 +733,7 @@ export class Parser {
     field: reflection.Field,
     discriminatorField: reflection.Field,
     readDefaults: boolean,
-  ): (table: Table) => Record<string, any>[] {
+  ): (table: Table) => (Record<string, any> | undefined)[] {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error(`Malformed schema: "type" field of '${field.name()}' not populated.`);
@@ -781,9 +781,10 @@ export class Parser {
           );
         }
 
-        // NONE becomes an empty object since we need to return an array of Record
+        // NONE becomes an undefined slot in the array because the values array is should match the
+        // discriminators length
         if (discriminator <= 0) {
-          result.push({});
+          result.push(undefined);
           continue;
         }
 

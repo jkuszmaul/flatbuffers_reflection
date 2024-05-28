@@ -244,124 +244,138 @@ export class Parser {
   constructor(private readonly schema: reflection.Schema) {}
 
   toObjectLambda(typeIndex: number, readDefaults = false): (t: Table) => Record<string, any> {
-    const lambdas: Record<string, (t: Table) => any> = {};
     const schema = this.getType(typeIndex);
     const numFields = schema.fieldsLength();
 
-    // Sort fields by ID so the resulting object is built with fields in this order.
-    // This tends to correspond with the order in the original .fbs (unless ids were specified manually).
-    const sortedFields: reflection.Field[] = [];
+    const fieldLambdas: {
+      id: number;
+      fieldName: string;
+      readField: ((t: Table) => unknown) | undefined;
+    }[] = [];
     for (let i = 0; i < numFields; ++i) {
       const field = schema.fields(i);
       if (field === null) {
         throw new Error(`Malformed schema: field at index ${i} not populated.`);
       }
-      sortedFields.push(field);
-    }
-    sortedFields.sort((a, b) => a.id() - b.id());
-
-    for (const field of sortedFields) {
-      const fieldType = field.type();
-      if (fieldType === null) {
-        throw new Error('Malformed schema: "type" field of Field not populated.');
-      }
       const fieldName = field.name();
       if (fieldName === null) {
         throw new Error('Malformed schema: "name" field of Field not populated.');
       }
-      const baseType = fieldType.baseType();
-      if (isScalar(baseType)) {
-        lambdas[fieldName] = this.readScalarLambda(field, typeIndex, readDefaults);
-      } else if (baseType === reflection.BaseType.String) {
-        lambdas[fieldName] = this.readStringLambda(field);
-      } else if (baseType === reflection.BaseType.Obj) {
-        const rawLambda = this.readTableLambda(field, typeIndex);
+      fieldLambdas.push({
+        fieldName,
+        id: field.id(),
+        readField: this.readFieldLambda(schema, field, typeIndex, readDefaults),
+      });
+    }
+
+    // Sort fields by ID so the resulting object is built with fields in this order.
+    // This tends to correspond with the order in the original .fbs (unless ids were specified manually).
+    fieldLambdas.sort((a, b) => a.id - b.id);
+
+    return (t: Table) => {
+      const obj: Record<string, any> = {};
+      // Go through and attempt to use every single field accessor; return the
+      // resulting object.
+      for (const { fieldName, readField } of fieldLambdas) {
+        const value = readField?.(t);
+        if (value !== null) {
+          obj[fieldName] = value;
+        }
+      }
+      return obj;
+    };
+  }
+
+  readFieldLambda(
+    schema: reflection.Object_,
+    field: reflection.Field,
+    typeIndex: number,
+    readDefaults = false,
+  ): ((t: Table) => unknown) | undefined {
+    const fieldType = field.type();
+    if (fieldType === null) {
+      throw new Error('Malformed schema: "type" field of Field not populated.');
+    }
+    const fieldName = field.name();
+    if (fieldName === null) {
+      throw new Error('Malformed schema: "name" field of Field not populated.');
+    }
+    const baseType = fieldType.baseType();
+    if (isScalar(baseType)) {
+      return this.readScalarLambda(field, typeIndex, readDefaults);
+    } else if (baseType === reflection.BaseType.String) {
+      return this.readStringLambda(field);
+    } else if (baseType === reflection.BaseType.Obj) {
+      const rawLambda = this.readTableLambda(field, typeIndex);
+      const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
+      return (t: Table) => {
+        const subTable = rawLambda(t);
+        if (subTable === null) {
+          return null;
+        }
+        return subTableLambda(subTable);
+      };
+    } else if (baseType === reflection.BaseType.Vector) {
+      const elementType = fieldType.element();
+      if (isScalar(elementType)) {
+        return this.readVectorOfScalarsLambda(field);
+      } else if (elementType === reflection.BaseType.String) {
+        return this.readVectorOfStringsLambda(field);
+      } else if (elementType === reflection.BaseType.Obj) {
+        const vectorLambda = this.readVectorOfTablesLambda(field);
         const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
-        lambdas[fieldName] = (t: Table) => {
-          const subTable = rawLambda(t);
-          if (subTable === null) {
+        return (t: Table) => {
+          const vector = vectorLambda(t);
+          if (vector === null) {
             return null;
           }
-          return subTableLambda(subTable);
+          const result = [];
+          for (const table of vector) {
+            result.push(subTableLambda(table));
+          }
+          return result;
         };
-      } else if (baseType === reflection.BaseType.Vector) {
-        const elementType = fieldType.element();
-        if (isScalar(elementType)) {
-          lambdas[fieldName] = this.readVectorOfScalarsLambda(field);
-        } else if (elementType === reflection.BaseType.String) {
-          lambdas[fieldName] = this.readVectorOfStringsLambda(field);
-        } else if (elementType === reflection.BaseType.Obj) {
-          const vectorLambda = this.readVectorOfTablesLambda(field);
-          const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
-          lambdas[fieldName] = (t: Table) => {
-            const vector = vectorLambda(t);
-            if (vector === null) {
-              return null;
-            }
-            const result = [];
-            for (const table of vector) {
-              result.push(subTableLambda(table));
-            }
-            return result;
-          };
-        } else if (elementType === reflection.BaseType.Union) {
-          // Similar to how a union is serialized in a table, a vector of union gets a sidecar field
-          // that is an array of discriminator values. This sidecar field is named as the union field
-          // with _type suffix
-          //
-          // https://flatbuffers.dev/md__schemas.html
-
-          const discriminatorFieldName = `${fieldName}_type`;
-          const unionDiscriminator = this.getField(discriminatorFieldName, typeIndex);
-
-          lambdas[fieldName] = this.readVectorOfUnionsLambda(
-            field,
-            unionDiscriminator,
-            readDefaults,
-          );
-        } else {
-          throw new Error("Vectors of Arrays are not supported.");
-        }
-      } else if (baseType === reflection.BaseType.Union) {
-        // A union gets a sidecar field that is the discriminator value. This sidecar field is named
-        // as the union field with _type suffix.
+      } else if (elementType === reflection.BaseType.Union) {
+        // Similar to how a union is serialized in a table, a vector of union gets a sidecar field
+        // that is an array of discriminator values. This sidecar field is named as the union field
+        // with _type suffix
         //
         // https://flatbuffers.dev/md__schemas.html
 
         const discriminatorFieldName = `${fieldName}_type`;
         const unionDiscriminator = this.getField(discriminatorFieldName, typeIndex);
 
-        lambdas[fieldName] = this.readUnionLambda(field, unionDiscriminator, readDefaults);
-      } else if (baseType === reflection.BaseType.Array) {
-        if (!schema.isStruct()) {
-          throw new Error("Arrays are only supported inside structs, not tables");
-        }
-        const elementType = fieldType.element();
-        if (isScalar(elementType)) {
-          lambdas[fieldName] = this.readArrayOfScalarsLambda(field);
-        } else if (elementType === reflection.BaseType.Obj) {
-          lambdas[fieldName] = this.readArrayOfStructsLambda(field, readDefaults);
-        } else {
-          throw new Error("Arrays may contain only scalar or struct fields");
-        }
+        return this.readVectorOfUnionsLambda(field, unionDiscriminator, readDefaults);
       } else {
-        throw new Error("Unions are not supported in field " + field.name());
+        throw new Error("Vectors of Arrays are not supported.");
+      }
+    } else if (baseType === reflection.BaseType.Union) {
+      // A union gets a sidecar field that is the discriminator value. This sidecar field is named
+      // as the union field with _type suffix.
+      //
+      // https://flatbuffers.dev/md__schemas.html
+
+      const discriminatorFieldName = `${fieldName}_type`;
+      const unionDiscriminator = this.getField(discriminatorFieldName, typeIndex);
+
+      return this.readUnionLambda(field, unionDiscriminator, readDefaults);
+    } else if (baseType === reflection.BaseType.Array) {
+      if (!schema.isStruct()) {
+        throw new Error("Arrays are only supported inside structs, not tables");
+      }
+      const elementType = fieldType.element();
+      if (isScalar(elementType)) {
+        return this.readArrayOfScalarsLambda(field);
+      } else if (elementType === reflection.BaseType.Obj) {
+        return this.readArrayOfStructsLambda(field, readDefaults);
+      } else {
+        throw new Error("Arrays may contain only scalar or struct fields");
       }
     }
-    return (t: Table) => {
-      const obj: Record<string, any> = {};
-      // Go through and attempt to use every single field accessor; return the
-      // resulting object.
-      for (const field in lambdas) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const value = lambdas[field]?.(t);
-        if (value !== null) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          obj[field] = value;
-        }
-      }
-      return obj;
-    };
+
+    throw new Error(
+      `Unsupported BaseType ${reflection.BaseType[baseType as number] ?? "unknown"} (${baseType})`,
+    );
   }
 
   // Parse a Table to a javascript object. This is can be used, e.g., to convert

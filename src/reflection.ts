@@ -373,7 +373,9 @@ export class Parser {
       }
     }
 
-    return undefined;
+    throw new Error(
+      `Unsupported BaseType ${reflection.BaseType[baseType as number] ?? "unknown"} (${baseType})`,
+    );
   }
 
   // Parse a Table to a javascript object. This is can be used, e.g., to convert

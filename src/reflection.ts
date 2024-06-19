@@ -358,7 +358,7 @@ export class Parser {
       const discriminatorFieldName = `${fieldName}_type`;
       const unionDiscriminator = this.getField(discriminatorFieldName, typeIndex);
 
-      return this.readUnionLambda(field, unionDiscriminator, readDefaults);
+      return this.readUnionLambda(field, unionDiscriminator, typeIndex, readDefaults);
     } else if (baseType === reflection.BaseType.Array) {
       if (!schema.isStruct()) {
         throw new Error("Arrays are only supported inside structs, not tables");
@@ -823,6 +823,7 @@ export class Parser {
   readUnionLambda(
     field: reflection.Field,
     discriminatorField: reflection.Field,
+    typeIndex: number,
     readDefaults: boolean,
   ): (table: Table) => Record<string, any> | undefined {
     const fieldType = field.type();
@@ -839,11 +840,7 @@ export class Parser {
       throw new Error(`Malformed schema: union discriminator field is not a scalar`);
     }
 
-    const parseDiscriminator = this.readScalarLambda(
-      discriminatorField,
-      discriminatorfieldType.index(),
-      readDefaults,
-    );
+    const parseDiscriminator = this.readScalarLambda(discriminatorField, typeIndex, readDefaults);
 
     const unionDeserializers = this.createUnionDeserializers(fieldType, readDefaults);
 

@@ -1,0 +1,15 @@
+struct StructA {
+  shine:double;
+}
+
+struct StructB {
+  count:uint8;
+}
+
+union Kind { StructA, StructB }
+
+table UnionStruct {
+  kind:Kind;
+}
+
+root_type UnionStruct;

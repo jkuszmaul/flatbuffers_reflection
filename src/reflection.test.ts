@@ -26,10 +26,13 @@ import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
 import { ArmsT } from "./test/gen/arms";
 import { Equipment } from "./test/gen/equipment";
 import { GemstoneT } from "./test/gen/gemstone";
+import { Kind } from "./test/gen/kind";
 import { Monster, MonsterT } from "./test/gen/monster";
 import { ShieldT } from "./test/gen/shield";
 import { ShieldDecorator } from "./test/gen/shield-decorator";
 import { SkullT } from "./test/gen/skull";
+import { StructBT } from "./test/gen/struct-b";
+import { UnionStruct, UnionStructT } from "./test/gen/union-struct";
 import { BaseType, EnumVal, Field, Schema, Type } from "./vendor/gen/reflection";
 
 describe("parseReflectionSchema", () => {
@@ -213,6 +216,30 @@ describe("parseReflectionSchema", () => {
         decorators: [undefined],
         decorators_type: [ShieldDecorator.NONE],
       },
+    });
+  });
+  it("supports union of struct", () => {
+    const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/UnionStruct.bfbs`);
+    const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
+    const schema = Schema.getRootAsSchema(schemaByteBuffer);
+
+    const unionStruct = new UnionStructT();
+
+    unionStruct.kind = new StructBT();
+    unionStruct.kindType = Kind.StructB;
+
+    const builder = new Builder();
+    UnionStruct.finishUnionStructBuffer(builder, unionStruct.pack(builder));
+
+    const parser = new Parser(schema);
+    const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
+    const schemaObject = parser.toObject(table);
+
+    expect(schemaObject).toEqual({
+      kind: {
+        count: 0,
+      },
+      kind_type: 2,
     });
   });
   it("converts uint8 vectors to uint8arrays", () => {

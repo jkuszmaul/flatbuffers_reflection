@@ -1,0 +1,18 @@
+// This sets up a schema file with more structs than tables to ensure the union discriminator is
+// correctly read from its parent table.
+
+struct StructA {
+  shine:double;
+}
+
+struct StructB {
+  count:uint8;
+}
+
+union Kind { StructA, StructB }
+
+table UnionStruct {
+  kind:Kind;
+}
+
+root_type UnionStruct;

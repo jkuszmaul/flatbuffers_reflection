@@ -2,6 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
+export { AA, AAT } from './aa';
 export { Arms, ArmsT } from './arms';
 export { Equipment } from './equipment';
 export { Gemstone, GemstoneT } from './gemstone';

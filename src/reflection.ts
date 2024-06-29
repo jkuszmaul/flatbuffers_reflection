@@ -861,7 +861,9 @@ export class Parser {
     const unionDeserializers = this.createUnionDeserializers(fieldType, readDefaults);
 
     // Unions can only be formed from tables so we know our union field will point to a table
-    const rawLambda = this.readTableLambda2(field);
+    // fixme
+    //const rawLambda = this.readTableLambda2(field);
+    const rawLambda = this.readTableLambda(field, typeIndex);
 
     return (table: Table) => {
       const discriminatorValue = parseDiscriminator(table);

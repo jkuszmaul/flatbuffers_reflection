@@ -554,6 +554,22 @@ export class Parser {
       return new Table(table.bb, fieldType.index(), objectStart, elementIsStruct);
     };
   }
+  readTableLambda2(field: reflection.Field): (t: Table) => Table | null {
+    const fieldType = field.type();
+    if (fieldType === null) {
+      throw new Error('Malformed schema: "type" field of Field not populated.');
+    }
+
+    return (table: Table) => {
+      const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
+      if (offsetToOffset === table.offset) {
+        return null;
+      }
+
+      const objectStart = table.bb.__indirect(offsetToOffset);
+      return new Table(table.bb, fieldType.index(), objectStart, false /* elementIsStruct */);
+    };
+  }
   // Reads a vector of scalars (like readScalar, may return a vector of BigInt's
   // instead). Also, will return null if the vector is not set.
   readVectorOfScalars(
@@ -845,7 +861,7 @@ export class Parser {
     const unionDeserializers = this.createUnionDeserializers(fieldType, readDefaults);
 
     // Unions can only be formed from tables so we know our union field will point to a table
-    const rawLambda = this.readTableLambda(field, fieldType.index());
+    const rawLambda = this.readTableLambda2(field);
 
     return (table: Table) => {
       const discriminatorValue = parseDiscriminator(table);

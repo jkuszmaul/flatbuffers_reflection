@@ -821,7 +821,7 @@ export class Parser {
         if (!typeTable) {
           throw new Error(`Malformed message bad table at ${field.name()} positon ${idx}`);
         }
-        result.push(deserializer[1](subTable));
+        result.push(deserializer[1](typeTable));
       }
 
       return result;

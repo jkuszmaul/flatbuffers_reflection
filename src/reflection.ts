@@ -914,6 +914,9 @@ export class Parser {
       }
 
       const elementIsStruct = this.getType(specificTypeIndex).isStruct();
+      if (elementIsStruct) {
+        throw new Error("Union of struct is not currently supported");
+      }
 
       const tableBuilder = (table: Table) => {
         const offsetToOffset = table.offset + table.bb.__offset(table.offset, fieldOffset);
@@ -921,7 +924,9 @@ export class Parser {
           return null;
         }
 
-        const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
+        // Re-enable once union support of struct is added
+        // const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
+        const objectStart = table.bb.__indirect(offsetToOffset);
         return new Table(table.bb, specificTypeIndex, objectStart, elementIsStruct);
       };
 

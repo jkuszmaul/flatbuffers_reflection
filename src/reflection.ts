@@ -817,11 +817,7 @@ export class Parser {
           throw new Error(`Malformed message missing table at ${field.name()} positon ${idx}`);
         }
 
-        const typeTable = deserializer[0](subTable);
-        if (!typeTable) {
-          throw new Error(`Malformed message bad table at ${field.name()} positon ${idx}`);
-        }
-        result.push(deserializer[1](typeTable));
+        result.push(deserializer[1](subTable));
       }
 
       return result;

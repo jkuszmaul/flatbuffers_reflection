@@ -1,12 +1,25 @@
-// Sentinel struct that we've named AA so it appears first in the list of "objects" in the
-// reflection schema. This helps catch logic errors in handling of field "typeIndex" lookups
+// Sentinel structs that we've named AA, AB, AC so they appears first in the list of "objects" in
+// the reflection schema. This helps catch logic errors in handling of field "typeIndex" lookups
 // that got lucky and landed on a table object even though the logic used the wrong "typeIndex"
 struct AA {
   count:double;
 }
 
+struct AB {
+  count:double;
+}
+
+struct AC {
+  count:double;
+}
+
+struct Rock {
+  hardness:uint8;
+}
+
 table Gemstone {
   shine:double;
+  rocks:[Rock];
 }
 
 table Arms {

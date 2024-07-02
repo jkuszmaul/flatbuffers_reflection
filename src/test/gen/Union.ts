@@ -3,10 +3,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 export { AA, AAT } from './aa';
+export { AB, ABT } from './ab';
+export { AC, ACT } from './ac';
 export { Arms, ArmsT } from './arms';
 export { Equipment } from './equipment';
 export { Gemstone, GemstoneT } from './gemstone';
 export { Monster, MonsterT } from './monster';
+export { Rock, RockT } from './rock';
 export { Shield, ShieldT } from './shield';
 export { ShieldDecorator } from './shield-decorator';
 export { Skull, SkullT } from './skull';

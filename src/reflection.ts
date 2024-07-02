@@ -78,8 +78,6 @@ function isScalar(baseType: reflection.BaseType): boolean {
   return false;
 }
 
-type ObjectDeserializer = (table: Table) => Record<string, any>;
-
 // Stores the data associated with a Table within a given buffer.
 export class Table {
   // Wrapper to represent an object (Table or Struct) within a ByteBuffer.
@@ -619,11 +617,8 @@ export class Parser {
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
       throw new Error("Field " + field.name() + " is not an vector.");
     }
-    if (
-      fieldType.element() !== reflection.BaseType.Obj &&
-      fieldType.element() !== reflection.BaseType.Union
-    ) {
-      throw new Error("Field " + field.name() + " is not a vector of objects or unions.");
+    if (fieldType.element() !== reflection.BaseType.Obj) {
+      throw new Error("Field " + field.name() + " is not a vector of objects");
     }
 
     const elementSchema = this.getType(fieldType.index());
@@ -759,16 +754,24 @@ export class Parser {
     // This will deserialize the vector of discriminator values
     const readDiscriminators = this.readVectorOfScalarsLambda(discriminatorField);
 
-    // This will read the vector of tables from the actual field
-    // How to deserialize each table will depend on the discriminator value at the same vector
-    // index position in the discriminator values field
-    const vectorLambda = this.readVectorOfTablesLambda(field);
+    // enum value -> specific type information
+    const specificTypes = new Map<
+      number,
+      { typeIndex: number; deserializer: (table: Table) => Record<string, any> | undefined }
+    >();
 
-    const unionDeserializers = this.createUnionDeserializers(
-      field.offset(),
-      fieldType,
-      readDefaults,
-    );
+    for (const [enumVal, type] of this.getUnionTypes(fieldType)) {
+      const specificTypeIndex = type.index();
+      if (specificTypeIndex < 0) {
+        continue;
+      }
+
+      const typeDeserializer = this.toObjectLambda(specificTypeIndex, readDefaults);
+      specificTypes.set(enumVal, {
+        typeIndex: specificTypeIndex,
+        deserializer: typeDeserializer,
+      });
+    }
 
     return (table: Table) => {
       const discriminators = readDiscriminators(table);
@@ -778,19 +781,22 @@ export class Parser {
         );
       }
 
-      const tables = vectorLambda(table);
-      if (tables == null) {
+      const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
+      if (offsetToOffset === table.offset) {
         throw new Error(`Malformed message: missing vector table for field: ${field.name()}`);
       }
 
-      if (discriminators.length !== tables.length) {
+      const numElements = table.bb.__vector_len(offsetToOffset);
+      if (discriminators.length !== numElements) {
         throw new Error(
           `malformed message: ${field.name()} length != ${discriminatorField.name()} length`,
         );
       }
 
       const result = [];
-      for (let idx = 0; idx < tables.length; ++idx) {
+      // Track the offset of the next table element in the vector.
+      let nextTableOffset = table.bb.__vector(offsetToOffset); // start with base offset
+      for (let idx = 0; idx < numElements; ++idx) {
         const discriminator = discriminators[idx];
         if (typeof discriminator !== "number") {
           throw new Error(
@@ -805,19 +811,29 @@ export class Parser {
           continue;
         }
 
-        const deserializer = unionDeserializers.get(discriminator);
-        if (!deserializer) {
+        const specificTypeInfo = specificTypes.get(discriminator);
+        if (!specificTypeInfo) {
           throw new Error(
             `Malformed message: unknown union type '${discriminator}' in field ${discriminatorField.name()}`,
           );
         }
 
-        const subTable = tables[idx];
-        if (!subTable) {
-          throw new Error(`Malformed message missing table at ${field.name()} positon ${idx}`);
+        const specificType = specificTypes.get(discriminator);
+        if (!specificType) {
+          throw new Error(`Malformed message: could not find union type: '${discriminator}'`);
         }
 
-        result.push(deserializer[1](subTable));
+        const subTable = new Table(
+          table.bb,
+          specificType.typeIndex,
+          table.bb.__indirect(nextTableOffset),
+          false /* elementIsStruct */,
+        );
+
+        // In a vector of union, each "element" is an object until we re-visit struct
+        // support
+        nextTableOffset += typeSize(reflection.BaseType.Obj);
+        result.push(specificTypeInfo.deserializer(subTable));
       }
 
       return result;
@@ -846,11 +862,34 @@ export class Parser {
 
     const parseDiscriminator = this.readScalarLambda(discriminatorField, typeIndex, readDefaults);
 
-    const unionDeserializers = this.createUnionDeserializers(
-      field.offset(),
-      fieldType,
-      readDefaults,
-    );
+    const fieldOffset = field.offset();
+
+    const unionDeserializers = new Map<number, (table: Table) => Record<string, any> | undefined>();
+
+    for (const [enumVal, type] of this.getUnionTypes(fieldType)) {
+      const specificTypeIndex = type.index();
+      if (specificTypeIndex < 0) {
+        continue;
+      }
+
+      const typeDeserializer = this.toObjectLambda(specificTypeIndex, readDefaults);
+      const deserializer = (table: Table) => {
+        const offsetToOffset = table.offset + table.bb.__offset(table.offset, fieldOffset);
+        if (offsetToOffset === table.offset) {
+          return undefined;
+        }
+
+        const subTable = new Table(
+          table.bb,
+          specificTypeIndex,
+          table.bb.__indirect(offsetToOffset),
+          false /* elementIsStruct */,
+        );
+        return typeDeserializer(subTable);
+      };
+
+      unionDeserializers.set(enumVal, deserializer);
+    }
 
     return (table: Table) => {
       const discriminatorValue = parseDiscriminator(table);
@@ -872,21 +911,23 @@ export class Parser {
         throw new Error(`Malformed message: could not find union type: '${discriminatorValue}'`);
       }
 
-      const subTable = deserializer[0](table);
-      if (!subTable) {
-        throw new Error(`Malformed message: missing union field table: '${field.name()}'`);
-      }
-      return deserializer[1](subTable);
+      return deserializer(table);
     };
   }
 
+  /** Read the specific types of a union field into a map of enum value -> specific type */
   // eslint-disable-next-line @foxglove/prefer-hash-private
-  private createUnionDeserializers(
-    fieldOffset: number,
-    fieldType: reflection.Type,
-    readDefaults: boolean,
-  ) {
-    const unionDeserializers = new Map<number, [(t: Table) => Table | null, ObjectDeserializer]>();
+  private getUnionTypes(fieldType: reflection.Type) {
+    const elementType =
+      fieldType.baseType() === reflection.BaseType.Vector
+        ? fieldType.element()
+        : fieldType.baseType();
+
+    if (elementType !== reflection.BaseType.Union) {
+      throw new Error(`invariant: getUnionTypes called with incorrect base type: ${elementType}`);
+    }
+
+    const unionDeserializers = new Map<number, reflection.Type>();
 
     // For union types, the index points to the enum which has the valid types of the union
     const enumIndex = fieldType.index();
@@ -915,24 +956,12 @@ export class Parser {
 
       const elementIsStruct = this.getType(specificTypeIndex).isStruct();
       if (elementIsStruct) {
-        throw new Error("Union of struct is not currently supported");
+        throw new Error("Union with struct element is not currently supported");
       }
 
-      const tableBuilder = (table: Table) => {
-        const offsetToOffset = table.offset + table.bb.__offset(table.offset, fieldOffset);
-        if (offsetToOffset === table.offset) {
-          return null;
-        }
-
-        // Re-enable once union support of struct is added
-        // const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
-        const objectStart = table.bb.__indirect(offsetToOffset);
-        return new Table(table.bb, specificTypeIndex, objectStart, elementIsStruct);
-      };
-
-      const typeDeserializer = this.toObjectLambda(specificTypeIndex, readDefaults);
-      unionDeserializers.set(Number(enumItem.value()), [tableBuilder, typeDeserializer]);
+      unionDeserializers.set(Number(enumItem.value()), specificType);
     }
+
     return unionDeserializers;
   }
 }

@@ -4,6 +4,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Rock, RockT } from './rock';
 
 
 export class Gemstone implements flatbuffers.IUnpackableObject<GemstoneT> {
@@ -29,12 +30,30 @@ shine():number {
   return offset ? this.bb!.readFloat64(this.bb_pos + offset) : 0.0;
 }
 
+rocks(index: number, obj?:Rock):Rock|null {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? (obj || new Rock()).__init(this.bb!.__vector(this.bb_pos + offset) + index, this.bb!) : null;
+}
+
+rocksLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
 static startGemstone(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 }
 
 static addShine(builder:flatbuffers.Builder, shine:number) {
   builder.addFieldFloat64(0, shine, 0.0);
+}
+
+static addRocks(builder:flatbuffers.Builder, rocksOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, rocksOffset, 0);
+}
+
+static startRocksVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(1, numElems, 1);
 }
 
 static endGemstone(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -42,33 +61,40 @@ static endGemstone(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createGemstone(builder:flatbuffers.Builder, shine:number):flatbuffers.Offset {
+static createGemstone(builder:flatbuffers.Builder, shine:number, rocksOffset:flatbuffers.Offset):flatbuffers.Offset {
   Gemstone.startGemstone(builder);
   Gemstone.addShine(builder, shine);
+  Gemstone.addRocks(builder, rocksOffset);
   return Gemstone.endGemstone(builder);
 }
 
 unpack(): GemstoneT {
   return new GemstoneT(
-    this.shine()
+    this.shine(),
+    this.bb!.createObjList<Rock, RockT>(this.rocks.bind(this), this.rocksLength())
   );
 }
 
 
 unpackTo(_o: GemstoneT): void {
   _o.shine = this.shine();
+  _o.rocks = this.bb!.createObjList<Rock, RockT>(this.rocks.bind(this), this.rocksLength());
 }
 }
 
 export class GemstoneT implements flatbuffers.IGeneratedObject {
 constructor(
-  public shine: number = 0.0
+  public shine: number = 0.0,
+  public rocks: (RockT)[] = []
 ){}
 
 
 pack(builder:flatbuffers.Builder): flatbuffers.Offset {
+  const rocks = builder.createStructOffsetList(this.rocks, Gemstone.startRocksVector);
+
   return Gemstone.createGemstone(builder,
-    this.shine
+    this.shine,
+    rocks
   );
 }
 }

@@ -78,6 +78,8 @@ function isScalar(baseType: reflection.BaseType): boolean {
   return false;
 }
 
+type ObjectDeserializer = (table: Table) => Record<string, any>;
+
 // Stores the data associated with a Table within a given buffer.
 export class Table {
   // Wrapper to represent an object (Table or Struct) within a ByteBuffer.
@@ -528,14 +530,11 @@ export class Parser {
     if (fieldType === null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
-    const parentIsStruct = this.getType(typeIndex).isStruct();
-    if (
-      fieldType.baseType() !== reflection.BaseType.Obj &&
-      fieldType.baseType() !== reflection.BaseType.Union
-    ) {
-      throw new Error("Field " + field.name() + " is not an object or union type.");
+    if (fieldType.baseType() !== reflection.BaseType.Obj) {
+      throw new Error("Field " + field.name() + " is not an object type.");
     }
 
+    const parentIsStruct = this.getType(typeIndex).isStruct();
     const elementIsStruct = this.getType(fieldType.index()).isStruct();
 
     if (parentIsStruct) {
@@ -765,7 +764,11 @@ export class Parser {
     // index position in the discriminator values field
     const vectorLambda = this.readVectorOfTablesLambda(field);
 
-    const unionDeserializers = this.createUnionDeserializers(fieldType, readDefaults);
+    const unionDeserializers = this.createUnionDeserializers(
+      field.offset(),
+      fieldType,
+      readDefaults,
+    );
 
     return (table: Table) => {
       const discriminators = readDiscriminators(table);
@@ -813,7 +816,8 @@ export class Parser {
         if (!subTable) {
           throw new Error(`Malformed message missing table at ${field.name()} positon ${idx}`);
         }
-        result.push(deserializer(subTable));
+
+        result.push(deserializer[1](subTable));
       }
 
       return result;
@@ -842,10 +846,11 @@ export class Parser {
 
     const parseDiscriminator = this.readScalarLambda(discriminatorField, typeIndex, readDefaults);
 
-    const unionDeserializers = this.createUnionDeserializers(fieldType, readDefaults);
-
-    // Unions can only be formed from tables so we know our union field will point to a table
-    const rawLambda = this.readTableLambda(field, fieldType.index());
+    const unionDeserializers = this.createUnionDeserializers(
+      field.offset(),
+      fieldType,
+      readDefaults,
+    );
 
     return (table: Table) => {
       const discriminatorValue = parseDiscriminator(table);
@@ -867,17 +872,21 @@ export class Parser {
         throw new Error(`Malformed message: could not find union type: '${discriminatorValue}'`);
       }
 
-      const subTable = rawLambda(table);
+      const subTable = deserializer[0](table);
       if (!subTable) {
         throw new Error(`Malformed message: missing union field table: '${field.name()}'`);
       }
-      return deserializer(subTable);
+      return deserializer[1](subTable);
     };
   }
 
   // eslint-disable-next-line @foxglove/prefer-hash-private
-  private createUnionDeserializers(fieldType: reflection.Type, readDefaults: boolean) {
-    const unionDeserializers = new Map<number, (t: Table) => Record<string, any>>();
+  private createUnionDeserializers(
+    fieldOffset: number,
+    fieldType: reflection.Type,
+    readDefaults: boolean,
+  ) {
+    const unionDeserializers = new Map<number, [(t: Table) => Table | null, ObjectDeserializer]>();
 
     // For union types, the index points to the enum which has the valid types of the union
     const enumIndex = fieldType.index();
@@ -904,8 +913,25 @@ export class Parser {
         continue;
       }
 
+      const elementIsStruct = this.getType(specificTypeIndex).isStruct();
+      if (elementIsStruct) {
+        throw new Error("Union of struct is not currently supported");
+      }
+
+      const tableBuilder = (table: Table) => {
+        const offsetToOffset = table.offset + table.bb.__offset(table.offset, fieldOffset);
+        if (offsetToOffset === table.offset) {
+          return null;
+        }
+
+        // Re-enable once union support of struct is added
+        // const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
+        const objectStart = table.bb.__indirect(offsetToOffset);
+        return new Table(table.bb, specificTypeIndex, objectStart, elementIsStruct);
+      };
+
       const typeDeserializer = this.toObjectLambda(specificTypeIndex, readDefaults);
-      unionDeserializers.set(Number(enumItem.value()), typeDeserializer);
+      unionDeserializers.set(Number(enumItem.value()), [tableBuilder, typeDeserializer]);
     }
     return unionDeserializers;
   }

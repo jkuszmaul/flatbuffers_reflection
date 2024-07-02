@@ -225,7 +225,7 @@ describe("parseReflectionSchema", () => {
 
     const unionStruct = new UnionStructT();
 
-    unionStruct.kind = new StructBT();
+    unionStruct.kind = new StructBT(3);
     unionStruct.kindType = Kind.StructB;
 
     const builder = new Builder();
@@ -233,14 +233,10 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table);
 
-    expect(schemaObject).toEqual({
-      kind: {
-        count: 0,
-      },
-      kind_type: 2,
-    });
+    expect(() => {
+      parser.toObject(table);
+    }).toThrow("Union of struct is not currently supported");
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();

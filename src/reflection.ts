@@ -818,14 +818,9 @@ export class Parser {
           );
         }
 
-        const specificType = specificTypes.get(discriminator);
-        if (!specificType) {
-          throw new Error(`Malformed message: could not find union type: '${discriminator}'`);
-        }
-
         const subTable = new Table(
           table.bb,
-          specificType.typeIndex,
+          specificTypeInfo.typeIndex,
           table.bb.__indirect(nextTableOffset),
           false /* elementIsStruct */,
         );

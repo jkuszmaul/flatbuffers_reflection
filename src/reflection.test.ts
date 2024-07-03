@@ -28,7 +28,8 @@ import { Equipment } from "./test/gen/equipment";
 import { GemstoneT } from "./test/gen/gemstone";
 import { Kind } from "./test/gen/kind";
 import { Monster, MonsterT } from "./test/gen/monster";
-import { ShieldT } from "./test/gen/shield";
+import { RockT } from "./test/gen/rock";
+import { Shield, ShieldT } from "./test/gen/shield";
 import { ShieldDecorator } from "./test/gen/shield-decorator";
 import { SkullT } from "./test/gen/skull";
 import { StructBT } from "./test/gen/struct-b";
@@ -163,7 +164,10 @@ describe("parseReflectionSchema", () => {
     monster.equipped.primaryDecorator = new ArmsT(12);
     monster.equipped.primaryDecoratorType = ShieldDecorator.Arms;
 
-    monster.equipped.decorators.push(new GemstoneT(1.02337));
+    const gemstone = new GemstoneT(1.02337);
+    gemstone.rocks.push(new RockT(7), new RockT(95));
+
+    monster.equipped.decorators.push(gemstone);
     monster.equipped.decorators.push(new SkullT("some-name"));
     monster.equipped.decoratorsType.push(ShieldDecorator.Gemstone);
     monster.equipped.decoratorsType.push(ShieldDecorator.Skull);
@@ -173,7 +177,7 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table);
+    const schemaObject = parser.toObject(table, true /* read defaults */);
 
     expect(schemaObject).toEqual({
       equipped_type: Equipment.Shield,
@@ -181,7 +185,10 @@ describe("parseReflectionSchema", () => {
         protection: 27.5,
         primary_decorator: { count: 12 },
         primary_decorator_type: ShieldDecorator.Arms,
-        decorators: [{ shine: 1.02337 }, { name: "some-name" }],
+        decorators: [
+          { shine: 1.02337, rocks: [{ hardness: 7 }, { hardness: 95 }] },
+          { name: "some-name" },
+        ],
         decorators_type: [ShieldDecorator.Gemstone, ShieldDecorator.Skull],
       },
     });
@@ -206,26 +213,77 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table);
 
-    expect(schemaObject).toEqual({
-      equipped_type: Equipment.Shield,
-      equipped: {
+    {
+      const schemaObject = parser.toObject(table, true /* read defaults */);
+      expect(schemaObject).toEqual({
+        equipped_type: Equipment.Shield,
+        equipped: {
+          protection: -27.5,
+          primary_decorator: undefined,
+          primary_decorator_type: ShieldDecorator.NONE,
+          decorators: [undefined],
+          decorators_type: [ShieldDecorator.NONE],
+        },
+      });
+    }
+
+    {
+      const schemaObject = parser.toObject(table, false /* read defaults */);
+      expect(schemaObject).toEqual({
+        equipped_type: Equipment.Shield,
+        equipped: {
+          protection: -27.5,
+          primary_decorator: undefined,
+          decorators: [undefined],
+          decorators_type: [ShieldDecorator.NONE],
+        },
+      });
+    }
+  });
+  it("supports empty union vector", () => {
+    const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/Union.bfbs`);
+    const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
+    const schema = Schema.getRootAsSchema(schemaByteBuffer);
+
+    const builder = new Builder();
+    // The flatbuffers object API (i.e., the ShieldT interface) doesn't allow us to not
+    // populate vectors (it always assumes that you are creating a zero-length vector).
+    // In order to actually exercise empty vectors we must construct the flatbuffer table
+    // directly.
+    Shield.startShield(builder);
+    Shield.addProtection(builder, -27.5);
+    builder.finish(Shield.endShield(builder));
+
+    const parser = new Parser(schema);
+    const table = Table.getNamedTable(new ByteBuffer(builder.asUint8Array()), schema, "Shield");
+
+    {
+      const schemaObject = parser.toObject(table, false /* read defaults */);
+      expect(schemaObject).toEqual({
+        protection: -27.5,
+      });
+    }
+
+    {
+      const schemaObject = parser.toObject(table, true /* read defaults */);
+      expect(schemaObject).toEqual({
         protection: -27.5,
         primary_decorator: undefined,
-        decorators: [undefined],
-        decorators_type: [ShieldDecorator.NONE],
-      },
-    });
+        primary_decorator_type: ShieldDecorator.NONE,
+      });
+    }
   });
-  it("supports union of struct", () => {
+  // In theory this could be supported but is not currently supported so we test that we correctly
+  // throw.
+  it("no support for union of struct", () => {
     const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/UnionStruct.bfbs`);
     const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
     const schema = Schema.getRootAsSchema(schemaByteBuffer);
 
     const unionStruct = new UnionStructT();
 
-    unionStruct.kind = new StructBT();
+    unionStruct.kind = new StructBT(3);
     unionStruct.kindType = Kind.StructB;
 
     const builder = new Builder();
@@ -233,14 +291,10 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table);
 
-    expect(schemaObject).toEqual({
-      kind: {
-        count: 0,
-      },
-      kind_type: 2,
-    });
+    expect(() => {
+      parser.toObject(table);
+    }).toThrow("Union with struct element is not currently supported");
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();

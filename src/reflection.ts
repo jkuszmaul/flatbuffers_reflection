@@ -778,7 +778,9 @@ export class Parser {
 
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
       if (offsetToOffset === table.offset) {
-        throw new Error(`Malformed message: missing vector table for field: ${field.name()} despite the discriminator vector being present.`);
+        throw new Error(
+          `Malformed message: missing vector table for field: ${field.name()} despite the discriminator vector being present.`,
+        );
       }
 
       const numElements = table.bb.__vector_len(offsetToOffset);

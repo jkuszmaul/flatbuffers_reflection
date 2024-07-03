@@ -106,7 +106,7 @@ describe("parseReflectionSchema", () => {
       expect(parser.readScalar(typeFb, "index", false)).toBe(123);
       // Confirm that readDefaults works.
       expect(parser.readScalar(typeFb, "base_size", true)).toBe(4);
-      expect(parser.readScalar(typeFb, "base_size", false)).toBe(null);
+      expect(parser.readScalar(typeFb, "base_size", false)).toBe(undefined);
     }
     {
       const builder = new Builder();
@@ -123,14 +123,14 @@ describe("parseReflectionSchema", () => {
       const fbBuffer = new ByteBuffer(array);
 
       const fieldTable = Table.getNamedTable(fbBuffer, schema, "reflection.Field");
-      expect(parser.readScalar(fieldTable, "deprecated", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "deprecated", false)).toBe(undefined);
       expect(parser.readScalar(fieldTable, "deprecated", true)).toBe(false);
       expect(parser.readScalar(fieldTable, "optional")).toBe(true);
-      expect(parser.readScalar(fieldTable, "default_integer", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "default_integer", false)).toBe(undefined);
       expect(parser.readScalar(fieldTable, "default_integer", true)).toBe(0n);
-      expect(parser.readScalar(fieldTable, "default_real", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "default_real", false)).toBe(undefined);
       expect(parser.readScalar(fieldTable, "default_real", true)).toBe(0);
-      expect(parser.readScalar(fieldTable, "padding", false)).toBe(null);
+      expect(parser.readScalar(fieldTable, "padding", false)).toBe(undefined);
       expect(parser.readScalar(fieldTable, "padding", true)).toBe(0);
     }
   });

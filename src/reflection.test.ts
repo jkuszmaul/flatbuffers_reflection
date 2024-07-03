@@ -177,7 +177,7 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table);
+    const schemaObject = parser.toObject(table, true /* read defaults */);
 
     expect(schemaObject).toEqual({
       equipped_type: Equipment.Shield,
@@ -213,17 +213,78 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table);
 
-    expect(schemaObject).toEqual({
-      equipped_type: Equipment.Shield,
-      equipped: {
-        protection: -27.5,
-        primary_decorator: undefined,
-        decorators: [undefined],
-        decorators_type: [ShieldDecorator.NONE],
-      },
-    });
+    {
+      const schemaObject = parser.toObject(table, true /* read defaults */);
+      expect(schemaObject).toEqual({
+        equipped_type: Equipment.Shield,
+        equipped: {
+          protection: -27.5,
+          primary_decorator: undefined,
+          primary_decorator_type: ShieldDecorator.NONE,
+          decorators: [undefined],
+          decorators_type: [ShieldDecorator.NONE],
+        },
+      });
+    }
+
+    {
+      const schemaObject = parser.toObject(table, false /* read defaults */);
+      expect(schemaObject).toEqual({
+        equipped_type: Equipment.Shield,
+        equipped: {
+          protection: -27.5,
+          primary_decorator: undefined,
+          decorators: [undefined],
+          decorators_type: [ShieldDecorator.NONE],
+        },
+      });
+    }
+  });
+  it("supports empty union vector", () => {
+    const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/Union.bfbs`);
+    const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
+    const schema = Schema.getRootAsSchema(schemaByteBuffer);
+
+    const monster = new MonsterT();
+
+    monster.equippedType = Equipment.Shield;
+    monster.equipped = new ShieldT();
+    monster.equipped.protection = -27.5;
+    monster.equipped.primaryDecoratorType = ShieldDecorator.NONE;
+
+    const builder = new Builder();
+    Monster.finishMonsterBuffer(builder, monster.pack(builder));
+
+    const parser = new Parser(schema);
+    const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
+
+    {
+      const schemaObject = parser.toObject(table, false /* read defaults */);
+      expect(schemaObject).toEqual({
+        equipped_type: Equipment.Shield,
+        equipped: {
+          protection: -27.5,
+          primary_decorator: undefined,
+          decorators: [],
+          decorators_type: [],
+        },
+      });
+    }
+
+    {
+      const schemaObject = parser.toObject(table, true /* read defaults */);
+      expect(schemaObject).toEqual({
+        equipped_type: Equipment.Shield,
+        equipped: {
+          protection: -27.5,
+          primary_decorator: undefined,
+          primary_decorator_type: ShieldDecorator.NONE,
+          decorators: [],
+          decorators_type: [],
+        },
+      });
+    }
   });
   // In theory this could be supported but is not currently supported so we test that we correctly
   // throw.

@@ -29,7 +29,7 @@ import { GemstoneT } from "./test/gen/gemstone";
 import { Kind } from "./test/gen/kind";
 import { Monster, MonsterT } from "./test/gen/monster";
 import { RockT } from "./test/gen/rock";
-import { ShieldT } from "./test/gen/shield";
+import { Shield, ShieldT } from "./test/gen/shield";
 import { ShieldDecorator } from "./test/gen/shield-decorator";
 import { SkullT } from "./test/gen/skull";
 import { StructBT } from "./test/gen/struct-b";
@@ -246,43 +246,31 @@ describe("parseReflectionSchema", () => {
     const schemaByteBuffer: ByteBuffer = new ByteBuffer(schemaBuffer);
     const schema = Schema.getRootAsSchema(schemaByteBuffer);
 
-    const monster = new MonsterT();
-
-    monster.equippedType = Equipment.Shield;
-    monster.equipped = new ShieldT();
-    monster.equipped.protection = -27.5;
-    monster.equipped.primaryDecoratorType = ShieldDecorator.NONE;
-
     const builder = new Builder();
-    Monster.finishMonsterBuffer(builder, monster.pack(builder));
+    // The flatbuffers object API (i.e., the ShieldT interface) doesn't allow us to not
+    // populate vectors (it always assumes that you are creating a zero-length vector).
+    // In order to actually exercise empty vectors we must construct the flatbuffer table
+    // directly.
+    Shield.startShield(builder);
+    Shield.addProtection(builder, -27.5);
+    builder.finish(Shield.endShield(builder));
 
     const parser = new Parser(schema);
-    const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
+    const table = Table.getNamedTable(new ByteBuffer(builder.asUint8Array()), schema, "Shield");
 
     {
       const schemaObject = parser.toObject(table, false /* read defaults */);
       expect(schemaObject).toEqual({
-        equipped_type: Equipment.Shield,
-        equipped: {
-          protection: -27.5,
-          primary_decorator: undefined,
-          decorators: [],
-          decorators_type: [],
-        },
+        protection: -27.5,
       });
     }
 
     {
       const schemaObject = parser.toObject(table, true /* read defaults */);
       expect(schemaObject).toEqual({
-        equipped_type: Equipment.Shield,
-        equipped: {
-          protection: -27.5,
-          primary_decorator: undefined,
-          primary_decorator_type: ShieldDecorator.NONE,
-          decorators: [],
-          decorators_type: [],
-        },
+        protection: -27.5,
+        primary_decorator: undefined,
+        primary_decorator_type: ShieldDecorator.NONE,
       });
     }
   });

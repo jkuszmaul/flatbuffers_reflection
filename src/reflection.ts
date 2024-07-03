@@ -741,7 +741,7 @@ export class Parser {
     field: reflection.Field,
     discriminatorField: reflection.Field,
     readDefaults: boolean,
-  ): (table: Table) => (Record<string, any> | undefined)[] {
+  ): (table: Table) => (Record<string, any> | undefined)[] | null {
     const fieldType = field.type();
     if (fieldType === null) {
       throw new Error(`Malformed schema: "type" field of '${field.name()}' not populated.`);
@@ -773,14 +773,12 @@ export class Parser {
     return (table: Table) => {
       const discriminators = readDiscriminators(table);
       if (!discriminators) {
-        throw new Error(
-          `Malformed message: missing vector discriminators field: ${discriminatorField.name()}`,
-        );
+        return null;
       }
 
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
       if (offsetToOffset === table.offset) {
-        throw new Error(`Malformed message: missing vector table for field: ${field.name()}`);
+        throw new Error(`Malformed message: missing vector table for field: ${field.name()} despite the discriminator vector being present.`);
       }
 
       const numElements = table.bb.__vector_len(offsetToOffset);

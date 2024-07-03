@@ -762,9 +762,6 @@ export class Parser {
 
     for (const [enumVal, type] of this.getUnionTypes(fieldType)) {
       const specificTypeIndex = type.index();
-      if (specificTypeIndex < 0) {
-        continue;
-      }
 
       const typeDeserializer = this.toObjectLambda(specificTypeIndex, readDefaults);
       specificTypes.set(enumVal, {
@@ -863,9 +860,6 @@ export class Parser {
 
     for (const [enumVal, type] of this.getUnionTypes(fieldType)) {
       const specificTypeIndex = type.index();
-      if (specificTypeIndex < 0) {
-        continue;
-      }
 
       const typeDeserializer = this.toObjectLambda(specificTypeIndex, readDefaults);
       const deserializer = (table: Table) => {
@@ -910,7 +904,11 @@ export class Parser {
     };
   }
 
-  /** Read the specific types of a union field into a map of enum value -> specific type */
+  /**
+   * Read the specific types of a union field into a map of enum value -> specific type
+   *
+   * Note: the _none_ enum value is not added since it has no specific type
+   * */
   // eslint-disable-next-line @foxglove/prefer-hash-private
   private getUnionTypes(fieldType: reflection.Type) {
     const elementType =
@@ -922,7 +920,8 @@ export class Parser {
       throw new Error(`invariant: getUnionTypes called with incorrect base type: ${elementType}`);
     }
 
-    const unionDeserializers = new Map<number, reflection.Type>();
+    // enum value -> specific type information
+    const specificTypes = new Map<number, reflection.Type>();
 
     // For union types, the index points to the enum which has the valid types of the union
     const enumIndex = fieldType.index();
@@ -943,7 +942,7 @@ export class Parser {
         throw new Error("Malformed schema: union enum missing unionType");
       }
 
-      // There is a placeholder for _None_ in the enum so we skip that type
+      // The 0 (none) enum value has no type index and we skip adding it to the output
       const specificTypeIndex = specificType.index();
       if (specificTypeIndex < 0) {
         continue;
@@ -954,9 +953,9 @@ export class Parser {
         throw new Error("Union with struct element is not currently supported");
       }
 
-      unionDeserializers.set(Number(enumItem.value()), specificType);
+      specificTypes.set(Number(enumItem.value()), specificType);
     }
 
-    return unionDeserializers;
+    return specificTypes;
   }
 }

@@ -1,11 +1,8 @@
 // This file is essentially a clone of upstream flatbuffers code which
 // uses different (less-restrictive) linters.
 /* eslint no-underscore-dangle: 0 */
-/* eslint no-restricted-syntax: 0 */
-/* eslint @foxglove/strict-equality: 0 */
 /* eslint @foxglove/no-boolean-parameters: 0 */
 /* eslint @typescript-eslint/switch-exhaustiveness-check: 0 */
-/* eslint @typescript-eslint/restrict-plus-operands: 0 */
 /* eslint @typescript-eslint/no-explicit-any: 0 */
 
 // This library provides a few basic reflection utilities for Flatbuffers.
@@ -168,7 +165,7 @@ export class Table {
   ): Table {
     for (let ii = 0; ii < schema.objectsLength(); ++ii) {
       const schemaObject = schema.objects(ii);
-      if (schemaObject !== null && schemaObject.name() === type) {
+      if (schemaObject != null && schemaObject.name() === type) {
         return new Table(
           bb,
           ii,
@@ -254,11 +251,11 @@ export class Parser {
     }[] = [];
     for (let i = 0; i < numFields; ++i) {
       const field = schema.fields(i);
-      if (field === null) {
+      if (field == null) {
         throw new Error(`Malformed schema: field at index ${i} not populated.`);
       }
       const fieldName = field.name();
-      if (fieldName === null) {
+      if (fieldName == null) {
         throw new Error('Malformed schema: "name" field of Field not populated.');
       }
       fieldLambdas.push({
@@ -278,7 +275,7 @@ export class Parser {
       // resulting object.
       for (const { fieldName, readField } of fieldLambdas) {
         const value = readField?.(t);
-        if (value !== null) {
+        if (value != undefined) {
           obj[fieldName] = value;
         }
       }
@@ -293,11 +290,11 @@ export class Parser {
     readDefaults = false,
   ): ((t: Table) => unknown) | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const fieldName = field.name();
-    if (fieldName === null) {
+    if (fieldName == null) {
       throw new Error('Malformed schema: "name" field of Field not populated.');
     }
     const baseType = fieldType.baseType();
@@ -310,8 +307,8 @@ export class Parser {
       const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
       return (t: Table) => {
         const subTable = rawLambda(t);
-        if (subTable === null) {
-          return null;
+        if (!subTable) {
+          return undefined;
         }
         return subTableLambda(subTable);
       };
@@ -326,8 +323,8 @@ export class Parser {
         const subTableLambda = this.toObjectLambda(fieldType.index(), readDefaults);
         return (t: Table) => {
           const vector = vectorLambda(t);
-          if (vector === null) {
-            return null;
+          if (!vector) {
+            return undefined;
           }
           const result = [];
           for (const table of vector) {
@@ -391,7 +388,7 @@ export class Parser {
   getType(typeIndex: number): reflection.Object_ {
     if (typeIndex === -1) {
       const rootTable = this.schema.rootTable();
-      if (rootTable === null) {
+      if (rootTable == null) {
         throw new Error("Malformed schema: No root table.");
       }
       return rootTable;
@@ -400,7 +397,7 @@ export class Parser {
       throw new Error("Type index out-of-range.");
     }
     const table = this.schema.objects(typeIndex);
-    if (table === null) {
+    if (table == null) {
       throw new Error("Malformed schema: No object at index " + typeIndex + ".");
     }
     return table;
@@ -413,7 +410,7 @@ export class Parser {
     const numFields = schema.fieldsLength();
     for (let ii = 0; ii < numFields; ++ii) {
       const field = schema.fields(ii);
-      if (field === null) {
+      if (field == null) {
         throw new Error("Malformed schema: Missing Field table at index " + ii + ".");
       }
       const name = field.name();
@@ -425,7 +422,7 @@ export class Parser {
   }
 
   // Reads a scalar with the given field name from a Table. If readDefaults
-  // is set to false and the field is unset, we will return null. If
+  // is set to false and the field is unset, we will return undefined. If
   // readDefaults is true and the field is unset, we will look-up the default
   // value for the field and return that.
   // For 64-bit fields, returns a BigInt rather than a standard number.
@@ -433,7 +430,7 @@ export class Parser {
     table: Table,
     fieldName: string,
     readDefaults = false,
-  ): number | bigint | boolean | null {
+  ): number | bigint | boolean | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readScalarLambda(field, table.typeIndex, readDefaults)(table);
   }
@@ -446,9 +443,9 @@ export class Parser {
     field: reflection.Field,
     typeIndex: number,
     readDefaults = false,
-  ): (t: Table) => number | bigint | boolean | null {
+  ): (t: Table) => number | bigint | boolean | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const isStruct = this.getType(typeIndex).isStruct();
@@ -467,7 +464,7 @@ export class Parser {
       const offset = t.offset + t.bb.__offset(t.offset, field.offset());
       if (offset === t.offset) {
         if (!readDefaults) {
-          return null;
+          return undefined;
         }
         switch (fieldType.baseType()) {
           case reflection.BaseType.Bool:
@@ -494,15 +491,15 @@ export class Parser {
     };
   }
   // Reads a string with the given field name from the provided Table.
-  // If the field is unset, returns null.
-  readString(table: Table, fieldName: string): string | null {
+  // If the field is unset, returns undefined.
+  readString(table: Table, fieldName: string): string | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readStringLambda(field)(table);
   }
 
-  readStringLambda(field: reflection.Field): (t: Table) => string | null {
+  readStringLambda(field: reflection.Field): (t: Table) => string | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.String) {
@@ -512,20 +509,20 @@ export class Parser {
     return (t: Table) => {
       const offsetToOffset = t.offset + t.bb.__offset(t.offset, field.offset());
       if (offsetToOffset === t.offset) {
-        return null;
+        return undefined;
       }
       return t.bb.__string(offsetToOffset) as string;
     };
   }
   // Reads a sub-message from the given Table. The sub-message may either be
-  // a struct or a Table. Returns null if the sub-message is not set.
-  readTable(table: Table, fieldName: string): Table | null {
+  // a struct or a Table. Returns undefined if the sub-message is not set.
+  readTable(table: Table, fieldName: string): Table | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readTableLambda(field, table.typeIndex)(table);
   }
-  readTableLambda(field: reflection.Field, typeIndex: number): (t: Table) => Table | null {
+  readTableLambda(field: reflection.Field, typeIndex: number): (t: Table) => Table | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Obj) {
@@ -544,7 +541,7 @@ export class Parser {
     return (table: Table) => {
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
       if (offsetToOffset === table.offset) {
-        return null;
+        return undefined;
       }
 
       const objectStart = elementIsStruct ? offsetToOffset : table.bb.__indirect(offsetToOffset);
@@ -552,20 +549,20 @@ export class Parser {
     };
   }
   // Reads a vector of scalars (like readScalar, may return a vector of BigInt's
-  // instead). Also, will return null if the vector is not set.
+  // instead). Also, will return undefined if the vector is not set.
   readVectorOfScalars(
     table: Table,
     fieldName: string,
-  ): (number | bigint | boolean)[] | Uint8Array | null {
+  ): (number | bigint | boolean)[] | Uint8Array | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readVectorOfScalarsLambda(field)(table);
   }
 
   readVectorOfScalarsLambda(
     field: reflection.Field,
-  ): (t: Table) => (number | bigint | boolean)[] | Uint8Array | null {
+  ): (t: Table) => (number | bigint | boolean)[] | Uint8Array | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
@@ -580,7 +577,7 @@ export class Parser {
     return (table: Table) => {
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
       if (offsetToOffset === table.offset) {
-        return null;
+        return undefined;
       }
 
       const numElements = table.bb.__vector_len(offsetToOffset);
@@ -604,14 +601,14 @@ export class Parser {
       return result;
     };
   }
-  // Reads a vector of tables. Returns null if vector is not set.
-  readVectorOfTables(table: Table, fieldName: string): Table[] | null {
+  // Reads a vector of tables. Returns undefined if vector is not set.
+  readVectorOfTables(table: Table, fieldName: string): Table[] | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readVectorOfTablesLambda(field)(table);
   }
-  readVectorOfTablesLambda(field: reflection.Field): (t: Table) => Table[] | null {
+  readVectorOfTablesLambda(field: reflection.Field): (t: Table) => Table[] | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
@@ -628,7 +625,7 @@ export class Parser {
     return (table: Table) => {
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
       if (offsetToOffset === table.offset) {
-        return null;
+        return undefined;
       }
       const numElements = table.bb.__vector_len(offsetToOffset);
       const result = [];
@@ -647,14 +644,14 @@ export class Parser {
       return result;
     };
   }
-  // Reads a vector of strings. Returns null if not set.
-  readVectorOfStrings(table: Table, fieldName: string): string[] | null {
+  // Reads a vector of strings. Returns undefined if not set.
+  readVectorOfStrings(table: Table, fieldName: string): string[] | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readVectorOfStringsLambda(field)(table);
   }
-  readVectorOfStringsLambda(field: reflection.Field): (t: Table) => string[] | null {
+  readVectorOfStringsLambda(field: reflection.Field): (t: Table) => string[] | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     if (fieldType.baseType() !== reflection.BaseType.Vector) {
@@ -667,7 +664,7 @@ export class Parser {
     return (table: Table) => {
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
       if (offsetToOffset === table.offset) {
-        return null;
+        return undefined;
       }
       const numElements = table.bb.__vector_len(offsetToOffset);
       const result = [];
@@ -684,7 +681,7 @@ export class Parser {
     field: reflection.Field,
   ): (t: Table) => Array<number | bigint | boolean> {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const arrayLength = fieldType.fixedLength();
@@ -710,7 +707,7 @@ export class Parser {
     readDefaults: boolean,
   ): (t: Table) => Array<Record<string, any>> {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
     const arrayLength = fieldType.fixedLength();
@@ -741,9 +738,9 @@ export class Parser {
     field: reflection.Field,
     discriminatorField: reflection.Field,
     readDefaults: boolean,
-  ): (table: Table) => (Record<string, any> | undefined)[] | null {
+  ): (table: Table) => (Record<string, any> | undefined)[] | undefined {
     const fieldType = field.type();
-    if (fieldType === null) {
+    if (fieldType == null) {
       throw new Error(`Malformed schema: "type" field of '${field.name()}' not populated.`);
     }
 
@@ -773,7 +770,7 @@ export class Parser {
     return (table: Table) => {
       const discriminators = readDiscriminators(table);
       if (!discriminators) {
-        return null;
+        return undefined;
       }
 
       const offsetToOffset = table.offset + table.bb.__offset(table.offset, field.offset());
@@ -844,7 +841,7 @@ export class Parser {
     }
 
     const discriminatorfieldType = discriminatorField.type();
-    if (discriminatorfieldType === null) {
+    if (discriminatorfieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
     }
 

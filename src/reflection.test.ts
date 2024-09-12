@@ -46,18 +46,36 @@ describe("parseReflectionSchema", () => {
     const schema = Schema.getRootAsSchema(reflectionSchemaByteBuffer);
     const parser = new Parser(schema);
     const table = Table.getRootTable(reflectionSchemaByteBuffer);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-    const schemaObject = parser.toObject(table) as any;
-    // Spot-check some individual features of the reflection schema. This
-    // covers testing that we can read vectors of tables.
-    expect(schemaObject["objects"].length).toEqual(schema.objectsLength());
-    expect(schemaObject["objects"].length).toEqual(10);
-    expect(schemaObject["objects"][0]!["name"]).toEqual("reflection.Enum");
-    expect(schemaObject["file_ident"]).toEqual("BFBS");
-    expect(schemaObject["file_ext"]).toEqual("bfbs");
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    expect(schemaObject["fbs_files"][0]["filename"].substr(-14)).toEqual("reflection.fbs");
-    expect(schemaObject["fbs_files"][0]["included_filenames"].length).toEqual(0);
+
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+      const schemaObject = parser.toObject(table) as any;
+      // Spot-check some individual features of the reflection schema. This
+      // covers testing that we can read vectors of tables.
+      expect(schemaObject["objects"].length).toEqual(schema.objectsLength());
+      expect(schemaObject["objects"].length).toEqual(10);
+      expect(schemaObject["objects"][0]!["name"]).toEqual("reflection.Enum");
+      expect(schemaObject["file_ident"]).toEqual("BFBS");
+      expect(schemaObject["file_ext"]).toEqual("bfbs");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      expect(schemaObject["fbs_files"][0]["filename"].substr(-14)).toEqual("reflection.fbs");
+      expect(schemaObject["fbs_files"][0]["included_filenames"].length).toEqual(0);
+    }
+
+    {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+      const schemaObject = parser.toProxyObjectLambda(table.typeIndex)(table) as any;
+      // Spot-check some individual features of the reflection schema. This
+      // covers testing that we can read vectors of tables.
+      expect(schemaObject["objects"].length).toEqual(schema.objectsLength());
+      expect(schemaObject["objects"].length).toEqual(10);
+      expect(schemaObject["objects"][0]!["name"]).toEqual("reflection.Enum");
+      expect(schemaObject["file_ident"]).toEqual("BFBS");
+      expect(schemaObject["file_ext"]).toEqual("bfbs");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      expect(schemaObject["fbs_files"][0]["filename"].substr(-14)).toEqual("reflection.fbs");
+      expect(schemaObject["fbs_files"][0]["included_filenames"].length).toEqual(0);
+    }
 
     // Test constructing a small object that specifically lets us exercise
     // some edge cases that the actual schema doesn't. Covered reflection
@@ -140,16 +158,35 @@ describe("parseReflectionSchema", () => {
     const schema = Schema.getRootAsSchema(reflectionSchemaByteBuffer);
     const parser = new Parser(schema);
     const table = Table.getRootTable(reflectionSchemaByteBuffer);
-    const schemaObject = parser.toObject(table);
-    expect(Object.keys(schemaObject)).toEqual([
-      "objects",
-      "enums",
-      "file_ident",
-      "file_ext",
-      "root_table",
-      "services",
-      "fbs_files",
-    ]);
+
+    {
+      const schemaObject = parser.toObject(table);
+      expect(Object.keys(schemaObject)).toEqual([
+        "objects",
+        "enums",
+        "file_ident",
+        "file_ext",
+        "root_table",
+        "services",
+        "fbs_files",
+      ]);
+    }
+
+    {
+      const proxyLambda = parser.toProxyObjectLambda(table.typeIndex);
+      const schemaObject = proxyLambda(table);
+
+      expect(Object.keys(schemaObject)).toEqual([
+        "objects",
+        "enums",
+        "file_ident",
+        "file_ext",
+        "root_table",
+        "services",
+        "advanced_features",
+        "fbs_files",
+      ]);
+    }
   });
   it("supports union types", () => {
     const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/Union.bfbs`);
@@ -177,9 +214,8 @@ describe("parseReflectionSchema", () => {
 
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
-    const schemaObject = parser.toObject(table, true /* read defaults */);
 
-    expect(schemaObject).toEqual({
+    expectObject(parser, table, false, {
       equipped_type: Equipment.Shield,
       equipped: {
         protection: 27.5,
@@ -214,32 +250,26 @@ describe("parseReflectionSchema", () => {
     const parser = new Parser(schema);
     const table = Table.getRootTable(new ByteBuffer(builder.asUint8Array()));
 
-    {
-      const schemaObject = parser.toObject(table, true /* read defaults */);
-      expect(schemaObject).toEqual({
-        equipped_type: Equipment.Shield,
-        equipped: {
-          protection: -27.5,
-          primary_decorator: undefined,
-          primary_decorator_type: ShieldDecorator.NONE,
-          decorators: [undefined],
-          decorators_type: [ShieldDecorator.NONE],
-        },
-      });
-    }
+    expectObject(parser, table, true /* read defaults */, {
+      equipped_type: Equipment.Shield,
+      equipped: {
+        protection: -27.5,
+        primary_decorator: undefined,
+        primary_decorator_type: ShieldDecorator.NONE,
+        decorators: [undefined],
+        decorators_type: [ShieldDecorator.NONE],
+      },
+    });
 
-    {
-      const schemaObject = parser.toObject(table, false /* read defaults */);
-      expect(schemaObject).toEqual({
-        equipped_type: Equipment.Shield,
-        equipped: {
-          protection: -27.5,
-          primary_decorator: undefined,
-          decorators: [undefined],
-          decorators_type: [ShieldDecorator.NONE],
-        },
-      });
-    }
+    expectObject(parser, table, false, {
+      equipped_type: Equipment.Shield,
+      equipped: {
+        protection: -27.5,
+        primary_decorator: undefined,
+        decorators: [undefined],
+        decorators_type: [ShieldDecorator.NONE],
+      },
+    });
   });
   it("supports empty union vector", () => {
     const schemaBuffer: Buffer = readFileSync(`${__dirname}/test/gen/Union.bfbs`);
@@ -258,21 +288,15 @@ describe("parseReflectionSchema", () => {
     const parser = new Parser(schema);
     const table = Table.getNamedTable(new ByteBuffer(builder.asUint8Array()), schema, "Shield");
 
-    {
-      const schemaObject = parser.toObject(table, false /* read defaults */);
-      expect(schemaObject).toEqual({
-        protection: -27.5,
-      });
-    }
+    expectObject(parser, table, false, {
+      protection: -27.5,
+    });
 
-    {
-      const schemaObject = parser.toObject(table, true /* read defaults */);
-      expect(schemaObject).toEqual({
-        protection: -27.5,
-        primary_decorator: undefined,
-        primary_decorator_type: ShieldDecorator.NONE,
-      });
-    }
+    expectObject(parser, table, true, {
+      protection: -27.5,
+      primary_decorator: undefined,
+      primary_decorator_type: ShieldDecorator.NONE,
+    });
   });
   // In theory this could be supported but is not currently supported so we test that we correctly
   // throw.
@@ -295,6 +319,10 @@ describe("parseReflectionSchema", () => {
     expect(() => {
       parser.toObject(table);
     }).toThrow("Union with struct element is not currently supported");
+
+    expect(() => {
+      parser.toProxyObjectLambda(table.typeIndex)(table);
+    }).toThrow("Union with struct element is not currently supported");
   });
   it("converts uint8 vectors to uint8arrays", () => {
     const builder = new Builder();
@@ -316,8 +344,16 @@ describe("parseReflectionSchema", () => {
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
-    const byteVectorObject = parser.toObject(table);
-    expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+
+    {
+      const byteVectorObject = parser.toObject(table);
+      expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+    }
+
+    {
+      const byteVectorObject = parser.toProxyObjectLambda(table.typeIndex)(table);
+      expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+    }
   });
   it("reads flatbuffer structs", () => {
     const builder = new Builder();
@@ -334,8 +370,14 @@ describe("parseReflectionSchema", () => {
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
-    const byteVectorObject = parser.toObject(table);
-    expect(byteVectorObject).toEqual({ nested_struct: { a: 971 } });
+
+    expectObject(parser, table, false, {
+      nested_struct: { a: 971 },
+    });
+
+    expectObject(parser, table, true, {
+      nested_struct: { a: 971 },
+    });
   });
   it("converts uint8 vectors to uint8arrays in an offset Uint8Array source", () => {
     const builder = new Builder();
@@ -357,8 +399,10 @@ describe("parseReflectionSchema", () => {
     const rawSchema = Schema.getRootAsSchema(byteVectorSchemaByteBuffer);
     const parser = new Parser(rawSchema);
     const table = Table.getNamedTable(byteVectorBB, rawSchema, "ByteVector");
-    const byteVectorObject = parser.toObject(table);
-    expect(byteVectorObject["data"]).toEqual(new Uint8Array([1, 2, 3]));
+
+    expectObject(parser, table, false, {
+      data: new Uint8Array([1, 2, 3]),
+    });
   });
 
   it("rejects invalid table offsets and vtables", () => {
@@ -455,6 +499,11 @@ describe("parseReflectionSchema", () => {
     expect(() => parser.toObject(reflectionFb)).toThrow(
       "Attempt to read scalar type 9 (size 8) at offset 275, which would extend beyond ByteBuffer (capacity 112)",
     );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    expect(() => parser.toProxyObjectLambda(reflectionFb.typeIndex)(reflectionFb)["value"]).toThrow(
+      "Attempt to read scalar type 9 (size 8) at offset 275, which would extend beyond ByteBuffer (capacity 112)",
+    );
   });
 
   it("reads arrays", () => {
@@ -515,7 +564,7 @@ describe("parseReflectionSchema", () => {
     const fbBuffer = new ByteBuffer(builder.asUint8Array());
 
     const table = Table.getRootTable(fbBuffer);
-    expect(parser.toObject(table)).toEqual({
+    expectObject(parser, table, false, {
       point3b_vec: arraysTable.point3bVec.map((p) => ({ ...p })),
       point3s_vec: arraysTable.point3sVec.map((p) => ({ ...p })),
       pad1: 1,
@@ -535,3 +584,24 @@ describe("parseReflectionSchema", () => {
     });
   });
 });
+
+// eslint-disable-next-line @foxglove/no-boolean-parameters
+function expectObject(parser: Parser, table: Table, readDefaults: boolean, object: unknown) {
+  {
+    const schemaObject = parser.toObject(table, readDefaults);
+    expect(schemaObject).toEqual(object);
+  }
+
+  {
+    const proxyLambda = parser.toProxyObjectLambda(table.typeIndex, readDefaults);
+    const schemaObject = proxyLambda(table);
+    expect(schemaObject).toEqual(object);
+  }
+
+  // Test that spreading works to populate a new object with the fields
+  {
+    const proxyLambda = parser.toProxyObjectLambda(table.typeIndex, readDefaults);
+    const schemaObject = proxyLambda(table);
+    expect({ ...schemaObject }).toEqual(object);
+  }
+}

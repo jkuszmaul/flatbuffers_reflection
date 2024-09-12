@@ -247,7 +247,7 @@ export class Parser {
     const fieldLambdas: {
       id: number;
       fieldName: string;
-      readField: ((t: Table) => unknown) | undefined;
+      readField: (t: Table) => unknown;
     }[] = [];
     for (let i = 0; i < numFields; ++i) {
       const field = schema.fields(i);
@@ -274,7 +274,7 @@ export class Parser {
       // Go through and attempt to use every single field accessor; return the
       // resulting object.
       for (const { fieldName, readField } of fieldLambdas) {
-        const value = readField?.(t);
+        const value = readField(t);
         if (value != undefined) {
           obj[fieldName] = value;
         }
@@ -283,12 +283,93 @@ export class Parser {
     };
   }
 
+  /**
+   * `toProxyObjectLambda` returns a function that, when invoked, returns a Proxy object. No
+   * deserialization happens when returning the proxy object. Instead, the de-serialization is
+   * deferred until property access.
+   *
+   * NOTE:
+   * While the "deserialized" objects returned from `toProxyObjectLambda` and `toObjectLambda`
+   * behave similarly from the perspective of the caller (i.e. propery access works, spread syntax
+   * works, `has` syntax works, etc), the memory profile of the two are different.
+   *
+   * The object from `toObjectLambda` is fully de-serialized into JS heap space from the input
+   * table. The table is no longer needed after the object is created. However, the Proxy object
+   * from `toProxyObjectLamda` holds a reference to the table (and any byte data it references) so
+   * that it can de-serialize fields on-demand.
+   *
+   * @returns A Proxy object which can be accessed like a regular javascript object that represents
+   * the table and its fields.
+   */
+  toProxyObjectLambda(typeIndex: number, readDefaults = false): (t: Table) => Record<string, any> {
+    const schema = this.getType(typeIndex);
+    const numFields = schema.fieldsLength();
+
+    const fieldLambdas: {
+      id: number;
+      fieldName: string;
+      readField: (t: Table) => unknown;
+    }[] = [];
+    for (let i = 0; i < numFields; ++i) {
+      const field = schema.fields(i);
+      if (field == null) {
+        throw new Error(`Malformed schema: field at index ${i} not populated.`);
+      }
+      const fieldName = field.name();
+      if (fieldName == null) {
+        throw new Error('Malformed schema: "name" field of Field not populated.');
+      }
+      fieldLambdas.push({
+        fieldName,
+        id: field.id(),
+        readField: this.readFieldLambda(schema, field, typeIndex, readDefaults),
+      });
+    }
+
+    // Sort fields by ID so the resulting object is built with fields in this order.
+    // This tends to correspond with the order in the original .fbs (unless ids were specified manually).
+    fieldLambdas.sort((a, b) => a.id - b.id);
+
+    // Loopup the function to read a field using the field name
+    const fieldNameToReadFn = new Map<string | symbol, (t: Table) => unknown>();
+    for (const item of fieldLambdas) {
+      fieldNameToReadFn.set(item.fieldName, item.readField);
+    }
+
+    const fieldNames = fieldLambdas.map((item) => item.fieldName);
+    return (t: Table) => {
+      const proxyObject = new Proxy(
+        {},
+        {
+          get(_target, property) {
+            return fieldNameToReadFn.get(property)?.(t);
+          },
+          ownKeys() {
+            return fieldNames;
+          },
+          getOwnPropertyDescriptor(_target, _property) {
+            return {
+              writable: false,
+              configurable: true,
+              enumerable: true,
+            };
+          },
+          has(_target, property) {
+            return fieldNameToReadFn.has(property);
+          },
+        },
+      );
+
+      return proxyObject;
+    };
+  }
+
   readFieldLambda(
     schema: reflection.Object_,
     field: reflection.Field,
     typeIndex: number,
     readDefaults = false,
-  ): ((t: Table) => unknown) | undefined {
+  ): (t: Table) => unknown {
     const fieldType = field.type();
     if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');

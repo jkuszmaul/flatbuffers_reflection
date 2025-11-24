@@ -23,6 +23,7 @@ import {
   Point3sT,
 } from "./test/gen/ArraysTable";
 import { ByteVector, NestedStruct } from "./test/gen/ByteVector";
+import { OptionalScalar, OptionalScalarT } from "./test/gen/OptionalScalar";
 import { ArmsT } from "./test/gen/arms";
 import { Equipment } from "./test/gen/equipment";
 import { GemstoneT } from "./test/gen/gemstone";
@@ -532,6 +533,56 @@ describe("parseReflectionSchema", () => {
       mat3x3f: { cols: arraysTable.mat3x3f?.cols.map((p) => ({ ...p })) },
       mat3x3d: { cols: arraysTable.mat3x3d?.cols.map((p) => ({ ...p })) },
       mat3x3e: { cols: arraysTable.mat3x3e?.cols.map((p) => ({ ...p })) },
+    });
+  });
+
+  it("supports optional scalars with read defaults", () => {
+    const schema = Schema.getRootAsSchema(
+      new ByteBuffer(readFileSync(`${__dirname}/test/gen/OptionalScalar.bfbs`)),
+    );
+    const parser = new Parser(schema);
+
+    const optionalScalar = new OptionalScalarT(undefined, undefined);
+
+    const builder = new Builder();
+    OptionalScalar.finishOptionalScalarBuffer(builder, optionalScalar.pack(builder));
+    const fbBuffer = new ByteBuffer(builder.asUint8Array());
+
+    const table = Table.getRootTable(fbBuffer);
+
+    const schemaObjectWithoutDefaults = parser.toObject(table, false /* read defaults */);
+
+    expect(schemaObjectWithoutDefaults).toEqual({
+      regular_field: undefined,
+      optional_field: null,
+    });
+
+    const schemaObjectWithDefaults = parser.toObject(table, true /* read defaults */);
+    expect(schemaObjectWithDefaults).toEqual({
+      regular_field: 0,
+      optional_field: null,
+    });
+  });
+
+  it("yields the appropriate value for an optional field when set", () => {
+    const schema = Schema.getRootAsSchema(
+      new ByteBuffer(readFileSync(`${__dirname}/test/gen/OptionalScalar.bfbs`)),
+    );
+    const parser = new Parser(schema);
+
+    const optionalScalar = new OptionalScalarT(10, 42);
+
+    const builder = new Builder();
+    OptionalScalar.finishOptionalScalarBuffer(builder, optionalScalar.pack(builder));
+    const fbBuffer = new ByteBuffer(builder.asUint8Array());
+
+    const table = Table.getRootTable(fbBuffer);
+
+    const schemaObjectWithoutDefaults = parser.toObject(table, true);
+
+    expect(schemaObjectWithoutDefaults).toEqual({
+      regular_field: 10,
+      optional_field: 42,
     });
   });
 });

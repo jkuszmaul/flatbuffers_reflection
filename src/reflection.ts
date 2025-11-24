@@ -275,7 +275,8 @@ export class Parser {
       // resulting object.
       for (const { fieldName, readField } of fieldLambdas) {
         const value = readField?.(t);
-        if (value != undefined) {
+        // Use typeof comparison so it will NOT filter out `null` from optional fields.
+        if (typeof value !== "undefined") {
           obj[fieldName] = value;
         }
       }
@@ -430,7 +431,7 @@ export class Parser {
     table: Table,
     fieldName: string,
     readDefaults = false,
-  ): number | bigint | boolean | undefined {
+  ): number | bigint | boolean | null | undefined {
     const field = this.getField(fieldName, table.typeIndex);
     return this.readScalarLambda(field, table.typeIndex, readDefaults)(table);
   }
@@ -443,7 +444,7 @@ export class Parser {
     field: reflection.Field,
     typeIndex: number,
     readDefaults = false,
-  ): (t: Table) => number | bigint | boolean | undefined {
+  ): (t: Table) => number | bigint | boolean | null | undefined {
     const fieldType = field.type();
     if (fieldType == null) {
       throw new Error('Malformed schema: "type" field of Field not populated.');
@@ -460,9 +461,17 @@ export class Parser {
       };
     }
 
+    const isOptional = field.optional();
+
     return (t: Table) => {
       const offset = t.offset + t.bb.__offset(t.offset, field.offset());
       if (offset === t.offset) {
+        // If the field is marked as 'optional' in the schema (i.e., its default is `null`),
+        // return `null` when the field is absent. This preserves FlatBuffers' optional-scalar semantics.
+        if (isOptional) {
+          return null;
+        }
+
         if (!readDefaults) {
           return undefined;
         }

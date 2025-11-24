@@ -1,0 +1,6 @@
+table OptionalScalar {
+  regular_field:short;
+  optional_field:short = null; // optional scalar
+}
+
+root_type OptionalScalar;
